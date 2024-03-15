@@ -13,7 +13,6 @@ end
 vim.opt.rtp:prepend(lazypath)
 
 local fileExplorer = {
-				-- File explorer plugin
 				"nvim-neo-tree/neo-tree.nvim",
 				lazy = true,
 				dependencies = { 
@@ -23,14 +22,31 @@ local fileExplorer = {
 				}
 		}
 
--- Load plugins
-local plugins = { fileExplorer, { 'kepano/flexoki-neovim', name = 'flexoki' } }
+local theme = {
+		'Mofiqul/vscode.nvim',
+		name = 'vscode',
+		config = function()
+				vim.cmd('colorscheme vscode')
+		end
+}
 
+local treeSitter = {
+		'nvim-treesitter/nvim-treesitter',
+		build = ":TSUpdate",
+		config = function () 
+						local configs = require("nvim-treesitter.configs")
 
-require("lazy").setup({
-		 'kepano/flexoki-neovim', name = 'flexoki' 
-}, { install = { missing = false }})
+				configs.setup({
+						ensure_installed = { "c", "lua", "vim", "vimdoc", "query", "elixir", "heex", "javascript", "html", "c_sharp" },
+						sync_install = false,
+						highlight = { enable = true },
+						indent = { enable = true },  
+				})
+				end
+}
 
-vim.cmd('colorscheme flexoki-dark')
+local plugins = { fileExplorer, theme, treeSitter }
+
+require("lazy").setup(plugins)
 
 
