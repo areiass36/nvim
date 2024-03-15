@@ -4,9 +4,9 @@ local options = {
 	relativenumber = true,
 	tabstop = 4,							-- set tab size
 	wildmenu = true,
-	wildmode = "list:longest"
+	wildmode = "list:longest",
 }
 
 for k, v in pairs(options) do
-	vim.opt[k] = v
+--	vim.opt[k] = v
 end
