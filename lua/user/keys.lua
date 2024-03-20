@@ -17,4 +17,4 @@ keys("n","<C-l>","<C-w>l",opts)
 keys("n","<C-h>","<C-w>h",opts)
 
 -- Toggle explorer
-keys("n","<leader>e",":Lex 30<cr>",opts)
+keys("n","<leader>e",":NvimTreeToggle<CR>",opts)

@@ -5,6 +5,7 @@ return {
 						require('vscode').setup({
 								color_overrides = {
 									    vscBack = '#000000',
+										vscPopupBack = '#000000',
 								},
 						})
 
