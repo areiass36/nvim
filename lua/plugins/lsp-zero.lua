@@ -10,6 +10,7 @@ return {
 			lsp_zero.on_attach(function(client, bufnr)
 				lsp_zero.default_keymaps({ buffer = bufnr })
 			end)
+		-- mason lsp installer
 			require('mason').setup({})
 			require('mason-lspconfig').setup({
 				ensure_installed = { 'volar', 'tsserver', 'csharp_ls', 'lua_ls', },
@@ -41,7 +42,7 @@ return {
 				filetypes = { 'typescript', 'javascript', 'javascriptreact', 'typescriptreact', 'vue', 'json' },
 				init_options = {
 					typescript = {
-						tsdk = nodePath() .. '@vue/typescript-plugin@2.0.6'
+						tsdk = nodePath() .. "@vue/typescript-plugin",
 					}
 				}
 			})
