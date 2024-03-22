@@ -13,7 +13,7 @@ return {
 			-- mason lsp installer
 			require('mason').setup({})
 			require('mason-lspconfig').setup({
-				ensure_installed = { 'volar', 'tsserver', 'csharp_ls', 'lua_ls', },
+				ensure_installed = { 'volar', 'tsserver', 'csharp_ls', 'lua_ls', 'pylsp' },
 				handlers = {
 					lsp_zero.default_setup,
 					vuels = lsp_zero.noop,
