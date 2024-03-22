@@ -10,6 +10,7 @@
   "nvim-tree.lua": { "branch": "master", "commit": "707b24af91a1d05823099ed8c5450796290466ba" },
   "nvim-treesitter": { "branch": "master", "commit": "904f373fc4e6fb474e3df35b57f78edee8e45267" },
   "plenary.nvim": { "branch": "master", "commit": "f7adfc4b3f4f91aab6caebf42b3682945fbc35be" },
+  "telescope-live-grep-args.nvim": { "branch": "master", "commit": "731a046da7dd3adff9de871a42f9b7fb85f60f47" },
   "telescope.nvim": { "branch": "master", "commit": "6312868392331c9c0f22725041f1ec2bef57c751" },
   "vscode": { "branch": "main", "commit": "ea9ff6da3756ab229bcb59aad1ea7749eb15b065" }
 }
