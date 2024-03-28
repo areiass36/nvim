@@ -1,20 +1,11 @@
-local opts = { noremap = true, silent = true }
 --define leader key
 vim.g.mapleader = ","
-vim.g.maplocalleader = ","
 
-local keys = vim.api.nvim_set_keymap --nvim api 
--- Resize windows
-keys("n","<C-Down>",":resize -2<CR>",opts)
-keys("n","<C-Up>",":resize +2<CR>",opts)
-keys("n","<C-Right>",":vertical resize +2<CR>",opts)
-keys("n","<C-Left>",":vertical resize -2<CR>",opts)
+-- Terminal keys
+vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", { silent = true })
 
 -- Change between windows
-keys("n","<C-j>","<C-w>j",opts)
-keys("n","<C-k>","<C-w>k",opts)
-keys("n","<C-l>","<C-w>l",opts)
-keys("n","<C-h>","<C-w>h",opts)
-
--- Toggle explorer
-keys("n","<leader>e",":NvimTreeToggle<CR>",opts)
+vim.keymap.set("n", "<C-j>", "<C-w>j", { silent = true })
+vim.keymap.set("n", "<C-k>", "<C-w>k", { silent = true })
+vim.keymap.set("n", "<C-l>", "<C-w>l", { silent = true })
+vim.keymap.set("n", "<C-h>", "<C-w>h", { silent = true })

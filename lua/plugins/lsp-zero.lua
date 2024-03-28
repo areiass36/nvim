@@ -6,6 +6,8 @@ return {
 		branch = 'v3.x',
 		config = function()
 			local lsp_zero = require('lsp-zero')
+			local lspconfig = require('lspconfig')
+
 			lsp_zero.extend_lspconfig()
 			lsp_zero.on_attach(function(client, bufnr)
 				lsp_zero.default_keymaps({ buffer = bufnr })
@@ -21,17 +23,20 @@ return {
 				},
 			})
 
-			-- lsp config
-			local node = nodePath()
-			require('lspconfig').csharp_ls.setup({})
-			require('lspconfig').lua_ls.setup({})
-			require('lspconfig').angularls.setup({})
-			require('lspconfig').tsserver.setup({
+			local os = vim.loop.os_uname().sysname;
+			local windowsNodePath = "C:\\Program Files\\nodejs\\node_modules"
+			local macNodePath = "/Users/areiass36/.asdf/installs/nodejs/20.11.1/lib/node_modules"
+
+			local npmPath = os == "Darwin" and macNodePath or windowsNodePath
+			lspconfig.csharp_ls.setup({})
+			lspconfig.lua_ls.setup({})
+			lspconfig.angularls.setup({})
+			lspconfig.tsserver.setup({
 				init_options = {
 					plugins = {
 						{
 							name = "@vue/typescript-plugin",
-							location = node .. "@vue/typescript-plugin",
+							location = npmPath .. "@vue/typescript-plugin",
 							languages = { "javascript", "typescript", "vue" },
 						},
 					},
@@ -42,11 +47,11 @@ return {
 					"vue",
 				},
 			})
-			require('lspconfig').volar.setup({
+			lspconfig.volar.setup({
 				filetypes = { 'typescript', 'javascript', 'javascriptreact', 'typescriptreact', 'vue', 'json' },
 				init_options = {
 					typescript = {
-						tsdk = node .. "@vue/typescript-plugin",
+						tsdk = npmPath .. "@vue/typescript-plugin",
 					}
 				}
 			})
