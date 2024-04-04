@@ -1,5 +1,3 @@
-require("utils")
-
 return {
 	{
 		'VonHeikemen/lsp-zero.nvim',
