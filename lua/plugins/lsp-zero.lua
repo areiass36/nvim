@@ -4,6 +4,12 @@ return {
 		branch = 'v3.x',
 		config = function()
 			local lsp_zero = require('lsp-zero')
+			lsp_zero.set_sign_icons({
+				error = '',
+				warn = '',
+				hint = '󰌵',
+				info = ''
+			})
 			local lspconfig = require('lspconfig')
 
 			lsp_zero.extend_lspconfig()
@@ -27,7 +33,16 @@ return {
 
 			local npmPath = os == "Darwin" and macNodePath or windowsNodePath
 			lspconfig.csharp_ls.setup({})
-			lspconfig.lua_ls.setup({})
+			lspconfig.lua_ls.setup({
+				settings = {
+					Lua = {
+						diagnostics = {
+							globals = { 'vim' }
+						}
+
+					}
+				}
+			})
 			lspconfig.angularls.setup({})
 			lspconfig.tsserver.setup({
 				init_options = {
