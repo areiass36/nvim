@@ -1,20 +1,11 @@
-local options = {
-	clipboard = "unnamedplus",
-	number = true,
-	relativenumber = true,
-	--	tabstop = 4, -- set tab size
-	--wildmenu = true,
-	--wildmode = "list:longest",
-}
-
-for k, v in pairs(options) do
-	vim.opt[k] = v
-end
-
+vim.opt.clipboard = "unnamedplus"
+vim.opt.number = true
+vim.opt.relativenumber = true
+vim.opt.wrap = false
 
 vim.api.nvim_create_autocmd("InsertLeave", {
 	buffer = buffer,
 	callback = function()
-		vim.lsp.buf.format { async = false, tabSize = 4 }
+		vim.lsp.buf.format { async = false }
 	end
 })
