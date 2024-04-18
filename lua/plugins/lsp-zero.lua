@@ -3,7 +3,7 @@ return {
 		'VonHeikemen/lsp-zero.nvim',
 		branch = 'v3.x',
 		config = function()
-			local lsp_zero = require('lsp-zero')
+			local lsp_zero = require 'lsp-zero'
 			lsp_zero.set_sign_icons({
 				error = '',
 				warn = '',
@@ -16,8 +16,8 @@ return {
 				lsp_zero.default_keymaps({ buffer = bufnr })
 			end)
 			-- mason lsp installer
-			require('mason').setup({})
-			require('mason-lspconfig').setup({
+			require 'mason'.setup({})
+			require 'mason-lspconfig'.setup({
 				ensure_installed = { 'volar', 'tsserver', 'lua_ls', 'pylsp', 'angularls', 'omnisharp' },
 				handlers = {
 					lsp_zero.default_setup,
@@ -25,7 +25,7 @@ return {
 				},
 			})
 
-			require('lsp')
+			require 'lsp'
 		end,
 	},
 	{ 'Hoffs/omnisharp-extended-lsp.nvim' },
