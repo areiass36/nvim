@@ -1,5 +1,4 @@
 require 'lspconfig'.omnisharp.setup({
-	cmd = { "dotnet", "/Users/areiass36/.local/share/nvim/mason/packages/omnisharp/libexec/OmniSharp.dll" },
 	settings = {
 		FormattingOptions = {
 			VarForBuiltInType = true,
