@@ -18,7 +18,7 @@ return {
 			-- mason lsp installer
 			require 'mason'.setup({})
 			require 'mason-lspconfig'.setup({
-				ensure_installed = { 'volar', 'tsserver', 'lua_ls', 'pylsp', 'angularls', 'omnisharp' },
+				ensure_installed = { 'volar', 'tsserver', 'lua_ls', 'angularls', 'omnisharp' },
 				handlers = {
 					lsp_zero.default_setup,
 					vuels = lsp_zero.noop,

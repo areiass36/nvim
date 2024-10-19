@@ -1,3 +1,4 @@
+--[[
 local npmPath = require('utils.nodepath')
 require 'lspconfig'.tsserver.setup({
 	init_options = {
@@ -14,4 +15,4 @@ require 'lspconfig'.tsserver.setup({
 		"typescript",
 		"vue",
 	},
-})
+}) ]]
