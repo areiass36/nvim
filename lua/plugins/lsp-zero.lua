@@ -27,6 +27,15 @@ return {
 					vuels = lsp_zero.noop,
 				},
 			})
+			require('mason-nvim-dap').setup({
+				ensure_installed = { 'coreclr' },
+				automatic_installation = true,
+				handlers = {
+					function(config)
+						require('mason-nvim-dap').default_setup(config)
+					end,
+				}
+			})
 
 			require 'lsp'
 		end,
@@ -38,4 +47,7 @@ return {
 	{ 'L3MON4D3/LuaSnip' },
 	{ "williamboman/mason.nvim", },
 	{ "williamboman/mason-lspconfig.nvim", },
+	{ 'mfussenegger/nvim-dap' },
+	{ 'rcarriga/nvim-dap-ui' },
+	{ 'jay-babu/mason-nvim-dap.nvim' },
 }
