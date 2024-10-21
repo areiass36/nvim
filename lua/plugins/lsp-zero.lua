@@ -24,9 +24,9 @@ return {
 				ensure_installed = { 'volar', 'lua_ls', 'angularls', 'omnisharp' },
 				handlers = {
 					lsp_zero.default_setup,
-					vuels = lsp_zero.noop,
 				},
 			})
+
 			require('mason-nvim-dap').setup({
 				ensure_installed = { 'coreclr' },
 				automatic_installation = true,

@@ -24,7 +24,7 @@ return {
 		require('dap').set_log_level('DEBUG')
 		dap.adapters.coreclr = {
 			type = 'executable',
-			command = vim.fn.stdpath('data') .. '/mason/bin/netcoredbg',
+			command = vim.fn.stdpath('data') .. 'mason/bin/netcoredbg',
 			args = { '--interpreter=vscode' }
 		}
 
@@ -36,13 +36,13 @@ return {
 				program = function()
 					os.execute('dotnet build --configuration Debug')
 					local cwd = vim.fn.getcwd()
-					local program = vim.fn.input('Path to dll:',
-						cwd .. '/bin/Debug/net8.0/Summeet.Api.dll',
+					local program = vim.fn.input('Dll:',
+						cwd .. '/bin/Debug/net8.0/',
 						'file')
-					print(program)
 					return program
 				end,
-				--cwd = '${workspaceFolder}',
+				console = 'integratedTerminal',
+				cwd = '${workspaceFolder}',
 				env = {
 					ASPNETCORE_ENVIRONMENT = 'Development',
 				}
