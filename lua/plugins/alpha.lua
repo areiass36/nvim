@@ -1,5 +1,7 @@
 return {
 	'goolord/alpha-nvim',
+	dependencies = {
+	},
 	config = function()
 		local alpha = require("alpha")
 		local dashboard = require("alpha.themes.dashboard")
@@ -25,17 +27,9 @@ return {
 			[[                                                                       ]],
 		}
 
-		_Gopts = {
-			position = "center",
-			hl = "Type",
-		}
-
-		local function footer()
-			return "areiass36"
-		end
-		dashboard.section.footer.val = footer()
-
-		dashboard.opts.opts.noautocmd = true
+		dashboard.section.footer.val = "areiass36"
+		dashboard.section.buttons.val = {}
+		--dashboard.opts.opts.noautocmd = true
 		alpha.setup(dashboard.opts)
 
 		require("alpha").setup(dashboard.opts)

@@ -3,6 +3,7 @@ vim.opt.number = true
 vim.opt.relativenumber = true
 vim.opt.wrap = false
 
+vim.opt.showmode = false
 vim.api.nvim_create_autocmd("InsertLeave", {
 	callback = function()
 		vim.lsp.buf.format { async = false }

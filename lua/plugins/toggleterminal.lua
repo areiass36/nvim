@@ -1,10 +1,20 @@
 return {
 	"akinsho/toggleterm.nvim",
-	version = "*",
-	opts = {
-		star_in_insert = true,
-				open_mapping = [[<leader>t]],
-				direction = 'float'
-	},
-	config = true
+	config = function()
+		local toggleterm = require('toggleterm');
+		toggleterm.setup({
+			direction = 'float',
+			float_opts = {
+				border = 'rounded',
+				winblend = 3,
+				highlights = {
+					FloatBorder = {
+						guifg = '#5a5a5a',
+						guibg = 'NONE'
+					}
+				}
+			}
+		});
+		--vim.keymap.set("n", "<leader>t", "<cmd>ToggleTerm<CR>", { noremap = true, silent = true });
+	end
 }

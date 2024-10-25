@@ -2,21 +2,39 @@ return {
 	{
 		'VonHeikemen/lsp-zero.nvim',
 		branch = 'v3.x',
+
 		config = function()
 			local lsp_zero = require 'lsp-zero'
 			lsp_zero.set_sign_icons({
-				error = '',
-				warn = '',
-				hint = '󰌵',
-				info = ''
+				error = '',
+				warn = '',
+				hint = '',
+				info = ''
 			})
 
 			lsp_zero.extend_lspconfig()
 			lsp_zero.on_attach(function(client, bufnr)
 				lsp_zero.default_keymaps({ buffer = bufnr })
+				vim.api.nvim_set_keymap('n', '<leader>rn', '<cmd>lua vim.lsp.buf.rename()<CR>',
+					{ noremap = true, silent = true })
 				vim.keymap.set('n', '<leader>ca',
 					'<cmd>lua vim.lsp.buf.code_action()<CR>',
 					{ noremap = true, silent = true, buffer = bufnr })
+
+				local cmp = require 'cmp';
+				cmp.setup({
+					window = {
+						completion = cmp.config.window.bordered(),
+						documentation = cmp.config.window.bordered()
+					},
+					mapping = cmp.mapping.preset.insert({
+						['<C-Space>'] = cmp.mapping.complete(),
+						['<CR>'] = cmp.mapping.confirm({
+							behavior = cmp.ConfirmBehavior.Insert,
+							select = true,
+						})
+					})
+				})
 			end)
 			-- mason lsp installer
 			require 'mason'.setup({})
