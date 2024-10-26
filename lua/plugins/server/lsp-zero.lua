@@ -7,7 +7,7 @@ return {
 		'hrsh7th/nvim-cmp',
 		--{ 'L3MON4D3/LuaSnip' },
 		--csharp
-		'Hoffs/omnisharp-extended-lsp.nvim',
+		{ 'Hoffs/omnisharp-extended-lsp.nvim' },
 	},
 	config = function()
 		vim.opt.signcolumn = 'yes';
