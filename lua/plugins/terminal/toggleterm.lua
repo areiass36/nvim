@@ -15,6 +15,5 @@ return {
 				}
 			}
 		});
-		--vim.keymap.set("n", "<leader>t", "<cmd>ToggleTerm<CR>", { noremap = true, silent = true });
 	end
 }

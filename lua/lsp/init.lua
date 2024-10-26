@@ -1,5 +1,0 @@
-require 'lsp.csharp'
-require 'lsp.angular'
-require 'lsp.javascript'
-require 'lsp.lua'
-require 'lsp.vue'
