@@ -1,14 +1,13 @@
 function Keys_terminal()
 	vim.keymap.set("n", "<leader>t", "<cmd>Telescope toggleterm_manager<CR>", { noremap = true, silent = true });
+
+	local actions = require("toggleterm-manager").actions;
 	return {
-		i = {
-			["<CR>"] = { action = require("toggleterm-manager").actions.toggle_term, exit_on_action = false },
-			["<C-i>"] = { action = require("toggleterm-manager").actions.create_term, exit_on_action = false },
-			["<C-d>"] = { action = require("toggleterm-manager").actions.delete_term, exit_on_action = false },
-			["<C-r>"] = { action = require("toggleterm-manager").actions.rename_term, exit_on_action = false },
-		},
 		n = {
-			["<CR>"] = { action = require("toggleterm-manager").actions.open_term, exit_on_action = true }
+			["<CR>"] = { action = actions.open_term, exit_on_action = true },
+			["r"] = { action = actions.rename_item, exit_on_action = false },
+			["d"] = { action = actions.delete_item, exit_on_action = false },
+			["c"] = { action = actions.create_and_name_term, exit_on_action = true }
 		}
 	}
 end

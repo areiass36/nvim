@@ -23,17 +23,17 @@ vim.diagnostic.config {
 }
 
 -- Install Lazy
-if not vim.loop.fs_stat(path.lazy) then
+if not vim.loop.fs_stat(Path.lazy) then
 	vim.fn.system({
 		"git",
 		"clone",
 		"--filter=blob:none",
 		"https://github.com/folke/lazy.nvim.git",
 		"--branch=stable",
-		path.lazy,
+		Path.lazy,
 	})
 end
-vim.opt.rtp:prepend(path.lazy)
+vim.opt.rtp:prepend(Path.lazy)
 
 local lazy = require("lazy");
 lazy.setup({

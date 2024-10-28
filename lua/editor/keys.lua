@@ -5,6 +5,9 @@ function Keys_editor()
 	vim.keymap.set("n", "<C-l>", "<C-w>l", { silent = true })
 	vim.keymap.set("n", "<C-h>", "<C-w>h", { silent = true })
 
+	-- Escape terminal
+	vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", { silent = true })
+
 	-- Remap alt-w = "∑" for deleting previou word
 	vim.keymap.set("i", "∑", "<C-w>", { silent = true })
 end

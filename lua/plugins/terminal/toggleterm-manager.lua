@@ -6,32 +6,15 @@ return {
 		"nvim-lua/plenary.nvim",
 	},
 	config = function()
-		local manager = require('toggleterm-manager');
-		manager.setup({
-			mappings = Keys_terminal(),
-			titles = {
-				preview = "Preview",
-				prompt = " Terminals",
-				results = "Results",
-			},
-			results = {
-				fields = {
-					"state",
-					"space",
-					"term_icon",
-					"term_name",
-				},
-				separator = " ",
-				term_icon = "",
-			},
-			search = {
-				field =
-				"term_name"
-			},
-			sort = {
-				field = "term_name",
-				ascending = true,
-			},
+		local toggleterm = require("toggleterm");
+		toggleterm.setup({
+			direction = 'float',
+			float_opts = {
+				border = 'rounded'
+			}
 		});
-	end,
+
+		local telescope = require("telescope");
+		telescope.load_extension("toggleterm_manager");
+	end
 }
