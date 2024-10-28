@@ -7,7 +7,7 @@ function Keys_terminal()
 			["<CR>"] = { action = actions.open_term, exit_on_action = true },
 			["r"] = { action = actions.rename_item, exit_on_action = false },
 			["d"] = { action = actions.delete_item, exit_on_action = false },
-			["c"] = { action = actions.create_and_name_term, exit_on_action = true }
+			["c"] = { action = actions.create_and_name_term, exit_on_action = false }
 		}
 	}
 end

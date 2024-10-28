@@ -12,7 +12,7 @@ return {
 
 		mason.setup({})
 		masonLspConfig.setup({
-			ensure_installed = { 'volar', 'lua_ls', 'angularls', 'omnisharp' },
+			ensure_installed = { 'volar', 'lua_ls', 'angularls', 'omnisharp', 'ts_ls' },
 			handlers = {
 				lsp_zero.default_setup,
 				vuels = lsp_zero.noop,

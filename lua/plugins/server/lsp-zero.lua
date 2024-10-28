@@ -1,6 +1,6 @@
 return {
 	'VonHeikemen/lsp-zero.nvim',
-	branch = 'v4.x',
+	branch = 'v3.x',
 	dependencies = {
 		'neovim/nvim-lspconfig',
 		'hrsh7th/cmp-nvim-lsp',
@@ -11,15 +11,9 @@ return {
 	},
 	config = function()
 		vim.opt.signcolumn = 'yes';
-		local lspconfig = require('lspconfig');
+
 		local lsp_zero = require('lsp-zero');
 		local cmp = require('cmp');
-
-		lspconfig.util.default_config.capabilities = vim.tbl_deep_extend(
-			'force',
-			lspconfig.util.default_config.capabilities,
-			require('cmp_nvim_lsp').default_capabilities()
-		);
 
 		lsp_zero.set_sign_icons({
 			error = '',
@@ -28,11 +22,14 @@ return {
 			info = ''
 		})
 
-		cmp.setup({
-			window = {
-				completion = cmp.config.window.bordered(),
-				documentation = cmp.config.window.bordered()
-			},
-		})
+		lsp_zero.extend_lspconfig();
+		lsp_zero.on_attach(function(client, bufnr)
+			cmp.setup({
+				window = {
+					completion = cmp.config.window.bordered(),
+					documentation = cmp.config.window.bordered()
+				},
+			})
+		end)
 	end,
 }
