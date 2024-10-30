@@ -5,7 +5,9 @@ return {
 		local theme = require('vscode');
 		theme.setup({
 			color_overrides = {
-				vscBack = '#000000'
+				vscBack = '#000000',
+				vscTabCurrent = '#000000',
+				vscPopupBack = '#000000'
 			},
 		});
 		vim.cmd('colorscheme vscode')

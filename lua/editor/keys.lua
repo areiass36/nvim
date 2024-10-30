@@ -10,4 +10,6 @@ function Keys_editor()
 
 	-- Remap alt-w = "∑" for deleting previou word
 	vim.keymap.set("i", "∑", "<C-w>", { silent = true })
+
+	vim.keymap.set("n", "<leader>s", ":lua vim.diagnostic.open_float()<CR>", { silent = true });
 end

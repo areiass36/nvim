@@ -17,9 +17,7 @@ vim.api.nvim_create_autocmd("InsertLeave", {
 
 
 vim.diagnostic.config {
-	virtual_text = {
-		prefix = ''
-	}
+	virtual_text = false
 }
 
 -- Install Lazy
