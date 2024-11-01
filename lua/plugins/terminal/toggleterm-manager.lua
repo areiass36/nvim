@@ -1,5 +1,5 @@
 return {
-	"ryanmsnyder/toggleterm-manager.nvim",
+	dir = "C:\\Users\\augusto.areias\\toggleterm-manager.nvim",
 	dependencies = {
 		"akinsho/nvim-toggleterm.lua",
 		"nvim-telescope/telescope.nvim",
