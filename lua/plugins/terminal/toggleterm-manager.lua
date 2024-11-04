@@ -9,6 +9,12 @@ return {
 		local manager = require("toggleterm-manager");
 		manager.setup({
 			mappings = Keys_terminal(),
+			results = {
+				fields = {
+					"term_icon",
+					"term_name"
+				}
+			}
 		});
 	end
 }

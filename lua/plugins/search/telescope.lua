@@ -6,6 +6,7 @@ return {
 		"nvim-lua/plenary.nvim",
 		"nvim-telescope/telescope-live-grep-args.nvim",
 		"gbrlsnchs/telescope-lsp-handlers.nvim",
+		"nvim-tree/nvim-web-devicons",
 		{ 'nvim-telescope/telescope-fzf-native.nvim', build = 'make' },
 	},
 	config = function()
