@@ -9,6 +9,12 @@ vim.opt.wrap = false;
 vim.opt.showmode = false;
 vim.g.mapleader = ","
 
+if vim.fn.has("win32") then
+	vim.opt.shell = "powershell"
+	vim.opt.shellcmdflag = "-NoLogo -NoProfile -ExecutionPolicy RemoteSigned -Command"
+	vim.opt.shellquote = ""
+	vim.opt.shellxquote = ""
+end
 vim.api.nvim_create_autocmd("InsertLeave", {
 	callback = function()
 		vim.lsp.buf.format { async = false }
