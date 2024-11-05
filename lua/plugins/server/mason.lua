@@ -12,10 +12,9 @@ return {
 
 		mason.setup({})
 		masonLspConfig.setup({
-			ensure_installed = { 'volar', 'lua_ls', 'angularls', 'omnisharp', 'ts_ls', 'jsonls' },
+			ensure_installed = { 'volar', 'lua_ls', 'angularls', 'omnisharp', 'ts_ls', 'jsonls', 'pyright' },
 			handlers = {
 				lsp_zero.default_setup,
-				vuels = lsp_zero.noop,
 			},
 		})
 		require('language');
