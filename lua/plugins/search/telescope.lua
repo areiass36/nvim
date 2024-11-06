@@ -29,6 +29,12 @@ return {
 				}
 			},
 			defaults = {
+				layout_strategy = 'horizontal',
+				layout_config = {
+					width = vim.o.columns,
+					height = vim.o.lines,
+					preview_width = vim.o.columns / 2,
+				},
 				file_ignore_patterns = {
 					"node_modules",
 					"bin",
