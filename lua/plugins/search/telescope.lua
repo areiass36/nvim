@@ -31,9 +31,15 @@ return {
 			defaults = {
 				layout_strategy = 'horizontal',
 				layout_config = {
-					width = vim.o.columns,
-					height = vim.o.lines,
-					preview_width = vim.o.columns / 2,
+					width = function()
+						return vim.o.columns
+					end,
+					height = function()
+						return vim.o.lines
+					end,
+					preview_width = function()
+						return vim.o.columns / 2
+					end,
 				},
 				file_ignore_patterns = {
 					"node_modules",
@@ -43,7 +49,6 @@ return {
 				}
 			}
 		})
-
 
 		telescope.load_extension('live_grep_args')
 		telescope.load_extension('fzf')

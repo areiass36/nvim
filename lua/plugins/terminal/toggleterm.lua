@@ -6,8 +6,12 @@ return {
 			direction = 'float',
 			float_opts = {
 				border = 'none',
-				width = vim.o.columns,
-				height = vim.o.lines - 2
+				width = function()
+					return vim.o.columns
+				end,
+				height = function()
+					return vim.o.lines - 2
+				end
 			}
 		});
 	end
