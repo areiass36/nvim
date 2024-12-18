@@ -5,6 +5,8 @@ function Keys_editor()
 	vim.keymap.set("n", "<C-l>", "<C-w>l", { silent = true })
 	vim.keymap.set("n", "<C-h>", "<C-w>h", { silent = true })
 
+	-- Blackhole delete
+	vim.keymap.set('n', 'X', "\"_d");
 	-- Escape terminal
 	vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", { silent = true })
 
