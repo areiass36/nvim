@@ -38,7 +38,7 @@ return {
 						return vim.o.lines
 					end,
 					preview_width = function()
-						return vim.o.columns / 2
+						return math.floor(vim.o.columns / 2)
 					end,
 				},
 				file_ignore_patterns = {
