@@ -19,9 +19,32 @@ function Keys_browser()
 end
 
 function Keys_search()
+	local harpoon = require("harpoon")
+	--local telescope = require("telescope.config").values
+
+	--[[local function toggle_telescope(harpoon_files)
+		local file_paths = {}
+		for _, item in ipairs(harpoon_files.items) do
+			table.insert(file_paths, item.value)
+		end
+
+		require("telescope.pickers").new({}, {
+			prompt_title = "Harpoon",
+			finder = require("telescope.finders").new_table({
+				results = file_paths,
+			}),
+			previewer = telescope.file_previewer({}),
+			sorter = telescope.generic_sorter({}),
+		}):find()
+	end ]] --
+
 	vim.keymap.set('n', '<leader>ff', require("telescope.builtin").find_files, {})
 	vim.keymap.set('n', '<leader>fg', ":lua require('telescope').extensions.live_grep_args.live_grep_args()<CR>", {})
 	vim.keymap.set('n', '<leader>fb', require("telescope.builtin").buffers, {})
+	vim.keymap.set("n", "<leader>es", function() harpoon.ui:toggle_quick_menu(harpoon:list()) end)
+	vim.keymap.set("n", "<leader>a", function() harpoon:list():add() end)
+	vim.keymap.set("n", "<C-S-P>", function() harpoon:list():prev() end)
+	vim.keymap.set("n", "<C-S-N>", function() harpoon:list():next() end)
 end
 
 function Keys_server()
