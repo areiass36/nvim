@@ -20,28 +20,46 @@ end
 
 function Keys_search()
 	local harpoon = require("harpoon")
-	--local telescope = require("telescope.config").values
+	local telescope = require("telescope.config").values
 
-	--[[local function toggle_telescope(harpoon_files)
-		local file_paths = {}
-		for _, item in ipairs(harpoon_files.items) do
-			table.insert(file_paths, item.value)
+	local function toggle_telescope(harpoon_files)
+		local finder = function(files)
+			local file_paths = {}
+			for _, item in ipairs(files.items) do
+				table.insert(file_paths, item.value)
+			end
+
+			return require("telescope.finders").new_table({
+				results = file_paths,
+			})
 		end
-
 		require("telescope.pickers").new({}, {
 			prompt_title = "Harpoon",
-			finder = require("telescope.finders").new_table({
-				results = file_paths,
-			}),
+			finder = finder(harpoon_files),
 			previewer = telescope.file_previewer({}),
 			sorter = telescope.generic_sorter({}),
+
+			attach_mappings = function(prompt_buffer_number, map)
+				-- The keymap you need
+				map("n", "d", function()
+					local state = require("telescope.actions.state")
+					local selected_entry = state.get_selected_entry()
+					local current_picker = state.get_current_picker(prompt_buffer_number)
+
+					-- This is the line you need to remove the entry
+					harpoon:list():remove(selected_entry)
+					current_picker:refresh(finder(harpoon:list()))
+				end)
+
+				return true
+			end,
 		}):find()
-	end ]] --
+	end
 
 	vim.keymap.set('n', '<leader>ff', require("telescope.builtin").find_files, {})
 	vim.keymap.set('n', '<leader>fg', ":lua require('telescope').extensions.live_grep_args.live_grep_args()<CR>", {})
 	vim.keymap.set('n', '<leader>fb', require("telescope.builtin").buffers, {})
-	vim.keymap.set("n", "<leader>es", function() harpoon.ui:toggle_quick_menu(harpoon:list()) end)
+	vim.keymap.set("n", "<leader>es", function() toggle_telescope(harpoon:list()) end)
 	vim.keymap.set("n", "<leader>a", function() harpoon:list():add() end)
 	vim.keymap.set("n", "<C-S-P>", function() harpoon:list():prev() end)
 	vim.keymap.set("n", "<C-S-N>", function() harpoon:list():next() end)
