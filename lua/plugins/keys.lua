@@ -23,34 +23,70 @@ function Keys_search()
 	local telescope = require("telescope.config").values
 
 	local function toggle_telescope(harpoon_files)
-		local finder = function(files)
-			local file_paths = {}
-			for _, item in ipairs(files.items) do
-				table.insert(file_paths, item.value)
-			end
+		local create_finder = function(files)
+			local results = {}
 
+			--print("received items in create_finder")
+			--print(vim.inspect(files))
+			local i = 1
+			for _, item in pairs(files.items) do
+				results[i] = item.value
+				i = i + 1
+			end
+			--print("this is my result")
+			--print(vim.inspect(results))
 			return require("telescope.finders").new_table({
-				results = file_paths,
+				results = results,
+				entry_maker = function(entry)
+					local display = vim.fn.fnamemodify(entry, ":t")
+					return {
+						value = entry,
+						display = display,
+						ordinal = display
+					}
+				end
+
 			})
 		end
+
 		require("telescope.pickers").new({}, {
 			prompt_title = "Harpoon",
-			finder = finder(harpoon_files),
+			finder = create_finder(harpoon_files),
 			previewer = telescope.file_previewer({}),
 			sorter = telescope.generic_sorter({}),
 
 			attach_mappings = function(prompt_buffer_number, map)
-				-- The keymap you need
 				map("n", "d", function()
 					local state = require("telescope.actions.state")
 					local selected_entry = state.get_selected_entry()
 					local current_picker = state.get_current_picker(prompt_buffer_number)
+					if not selected_entry then return end
 
-					-- This is the line you need to remove the entry
-					harpoon:list():remove(selected_entry)
-					current_picker:refresh(finder(harpoon:list()))
+					local list = harpoon:list()
+
+					local file_name = selected_entry.value
+
+
+					--print("picked file name")
+					--print(file_name)
+					local item_to_remove = nil
+
+					for _, item in pairs(harpoon:list().items) do
+						if item.value == file_name then
+							item_to_remove = item
+						end
+					end
+
+					--print("before remove list")
+					--print(vim.inspect(list))
+					list:remove(item_to_remove)
+					--print("after remove list")
+					--print(vim.inspect(list))
+					local new_finder = create_finder(list)
+					--print("inpected new_finder")
+					--print(vim.inspect(new_finder))
+					current_picker:refresh(new_finder)
 				end)
-
 				return true
 			end,
 		}):find()
