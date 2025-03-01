@@ -46,7 +46,6 @@ lazy.setup({
 		{ import = 'plugins.interface' },
 		{ import = 'plugins.terminal' },
 		{ import = 'plugins.search' },
-		{ import = 'plugins.browser' },
 		{ import = 'plugins.server' },
 	},
 });
@@ -55,5 +54,4 @@ lazy.setup({
 Keys_editor();
 Keys_terminal();
 Keys_search();
-Keys_browser();
 Keys_server();

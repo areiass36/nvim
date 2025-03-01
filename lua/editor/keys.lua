@@ -10,8 +10,5 @@ function Keys_editor()
 	-- Escape terminal
 	vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", { silent = true })
 
-	-- Remap alt-w = "∑" for deleting previou word
-	vim.keymap.set("i", "∑", "<C-w>", { silent = true })
-
 	vim.keymap.set("n", "<leader>s", ":lua vim.diagnostic.open_float()<CR>", { silent = true });
 end
