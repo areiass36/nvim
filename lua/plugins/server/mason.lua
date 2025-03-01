@@ -3,6 +3,7 @@ return {
 	dependencies = {
 		"williamboman/mason-lspconfig.nvim",
 		'VonHeikemen/lsp-zero.nvim',
+		'kvstore',
 		'neovim/nvim-lspconfig',
 	},
 	config = function()
