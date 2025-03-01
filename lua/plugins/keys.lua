@@ -1,5 +1,7 @@
+local opts = { noremap = true, silent = true }
+
 function Keys_terminal()
-	vim.keymap.set("n", "<leader>t", "<cmd>Telescope toggleterm_manager<CR>", { noremap = true, silent = true });
+	vim.keymap.set("n", "<leader>t", "<cmd>Telescope toggleterm_manager<CR>", opts);
 
 	local actions = require("toggleterm-manager").actions;
 	return {
@@ -13,28 +15,25 @@ function Keys_terminal()
 end
 
 function Keys_search()
-	vim.keymap.set('n', '<leader>ff', require("telescope.builtin").find_files, {})
-	vim.keymap.set('n', '<leader>fg', ":lua require('telescope').extensions.live_grep_args.live_grep_args()<CR>", {})
-	vim.keymap.set('n', '<leader>fb', require("telescope.builtin").buffers, {})
-	vim.keymap.set("n", "<leader>es", ":lua require('telescope').extensions.telepoon.telepoon()<CR>",
-		{ noremap = true, silent = true })
-	vim.keymap.set("n", "<leader>a", ":lua require('harpoon'):list():add()",
-		{ noremap = true, silent = true })
-	--vim.keymap.set("n", "<C-S-P>", function() harpoon:list():prev() end)
-	--vim.keymap.set("n", "<C-S-N>", function() harpoon:list():next() end)
+	vim.keymap.set('n', '<leader>ff', require("telescope.builtin").find_files, opts)
+	vim.keymap.set('n', '<leader>fg', ":lua require('telescope').extensions.live_grep_args.live_grep_args()<CR>",
+		opts)
+	vim.keymap.set('n', '<leader>fb', require("telescope.builtin").buffers, opts)
+	vim.keymap.set("n", "<leader>es", ":lua require('telescope').extensions.telepoon.telepoon()<CR>", opts)
+	vim.keymap.set("n", "<leader>a", ":lua require('harpoon'):list():add()<CR>", opts)
 	vim.keymap.set("n", "<leader>ee", ":lua require('telescope').extensions.file_browser.file_browser()<CR>")
 	vim.keymap.set("n", "<leader>ef",
 		":lua require('telescope').extensions.file_browser.file_browser({ path = '%:p:h', select_buffer = true })<CR>");
 end
 
 function Keys_server()
-	vim.keymap.set('n', 'gh', '<cmd>lua vim.lsp.buf.hover()<cr>', { noremap = true, silent = true })
-	vim.keymap.set({ "v", "n" }, "ga", require("actions-preview").code_actions)
-	vim.keymap.set('n', 'gd', '<cmd>lua vim.lsp.buf.definition()<cr>', { noremap = true, silent = true })
-	vim.keymap.set('n', 'gD', '<cmd>lua vim.lsp.buf.declaration()<cr>', { noremap = true, silent = true })
-	vim.keymap.set('n', 'gi', '<cmd>lua vim.lsp.buf.implementation()<cr>', { noremap = true, silent = true })
-	vim.keymap.set('n', 'go', '<cmd>lua vim.lsp.buf.type_definition()<cr>', { noremap = true, silent = true })
-	vim.keymap.set('n', 'gr', '<cmd>lua vim.lsp.buf.references()<cr>', { noremap = true, silent = true })
-	vim.keymap.set('n', 'gs', '<cmd>lua vim.lsp.buf.signature_help()<cr>', { noremap = true, silent = true })
-	vim.keymap.set('n', 'rn', '<cmd>lua vim.lsp.buf.rename()<CR>', { noremap = true, silent = true });
+	vim.keymap.set('n', 'gh', '<cmd>lua vim.lsp.buf.hover()<CR>', opts)
+	vim.keymap.set({ "v", "n" }, "ga", ":lua require('actions-preview').code_actions<CR>", opts)
+	vim.keymap.set('n', 'gd', '<cmd>lua vim.lsp.buf.definition()<CR>', opts)
+	vim.keymap.set('n', 'gD', '<cmd>lua vim.lsp.buf.declaration()<CR>', opts)
+	vim.keymap.set('n', 'gi', '<cmd>lua vim.lsp.buf.implementation()<CR>', opts)
+	vim.keymap.set('n', 'go', '<cmd>lua vim.lsp.buf.type_definition()<CR>', opts)
+	vim.keymap.set('n', 'gr', '<cmd>lua vim.lsp.buf.references()<CR>', opts)
+	vim.keymap.set('n', 'gs', '<cmd>lua vim.lsp.buf.signature_help()<CR>', opts)
+	vim.keymap.set('n', 'rn', '<cmd>lua vim.lsp.buf.rename()<CR>', opts);
 end
