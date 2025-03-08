@@ -28,7 +28,7 @@ end
 
 function Keys_server()
 	vim.keymap.set('n', 'gh', '<cmd>lua vim.lsp.buf.hover()<CR>', opts)
-	vim.keymap.set({ "v", "n" }, "ga", ":lua require('actions-preview').code_actions<CR>", opts)
+	vim.keymap.set({ "v", "n" }, "ga", ":lua require('actions-preview').code_actions()<CR>", opts)
 	vim.keymap.set('n', 'gd', '<cmd>lua vim.lsp.buf.definition()<CR>', opts)
 	vim.keymap.set('n', 'gD', '<cmd>lua vim.lsp.buf.declaration()<CR>', opts)
 	vim.keymap.set('n', 'gi', '<cmd>lua vim.lsp.buf.implementation()<CR>', opts)
