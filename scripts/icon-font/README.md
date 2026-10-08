@@ -1,10 +1,12 @@
 # Icon font
 
-`assets/fonts/ConfigIcons.ttf` is built from `assets/icons/*.svg` (Font Awesome Pro, solid style).
-`assets/icons/map.json` assigns each SVG a codepoint from U+F600; `lua/core/icons.lua` mirrors it.
+`assets/fonts/ConfigIcons.ttf` is built from Font Awesome Pro SVGs (solid style). The SVGs are not in
+this repository (Pro license); `assets/icons/map.json` lists, for each icon, its name, codepoint
+(U+F600 onwards) and the Font Awesome icon name. `lua/core/icons.lua` mirrors the map.
 
 ```sh
-cd scripts/icon-font && npm install && npm run build
+cd scripts/icon-font && npm install
+FONTAWESOME_SOLID=/path/to/fontawesome/solid npm run build
 ```
 
 Every glyph is drawn in a 600x1000 box (JetBrains Mono's advance width), 540 units tall and seated on

@@ -2,166 +2,166 @@
  {
   "name": "diagnostic_error",
   "codepoint": 62976,
-  "file": "/Users/areias/.config/nvim/assets/icons/diagnostic_error.svg"
+  "icon": "circle-xmark"
  },
  {
   "name": "diagnostic_warn",
   "codepoint": 62977,
-  "file": "/Users/areias/.config/nvim/assets/icons/diagnostic_warn.svg"
+  "icon": "triangle-exclamation"
  },
  {
   "name": "diagnostic_info",
   "codepoint": 62978,
-  "file": "/Users/areias/.config/nvim/assets/icons/diagnostic_info.svg"
+  "icon": "circle-info"
  },
  {
   "name": "diagnostic_hint",
   "codepoint": 62979,
-  "file": "/Users/areias/.config/nvim/assets/icons/diagnostic_hint.svg"
+  "icon": "lightbulb"
  },
  {
   "name": "breakpoint",
   "codepoint": 62980,
-  "file": "/Users/areias/.config/nvim/assets/icons/breakpoint.svg"
+  "icon": "circle-dot"
  },
  {
   "name": "breakpoint_condition",
   "codepoint": 62981,
-  "file": "/Users/areias/.config/nvim/assets/icons/breakpoint_condition.svg"
+  "icon": "circle-question"
  },
  {
   "name": "breakpoint_rejected",
   "codepoint": 62982,
-  "file": "/Users/areias/.config/nvim/assets/icons/breakpoint_rejected.svg"
+  "icon": "ban"
  },
  {
   "name": "stopped",
   "codepoint": 62983,
-  "file": "/Users/areias/.config/nvim/assets/icons/stopped.svg"
+  "icon": "arrow-right"
  },
  {
   "name": "dotnet",
   "codepoint": 62984,
-  "file": "/Users/areias/.config/nvim/assets/icons/dotnet.svg"
+  "icon": "hashtag"
  },
  {
   "name": "node",
   "codepoint": 62985,
-  "file": "/Users/areias/.config/nvim/assets/icons/node.svg"
+  "icon": "circle-nodes"
  },
  {
   "name": "python",
   "codepoint": 62986,
-  "file": "/Users/areias/.config/nvim/assets/icons/python.svg"
+  "icon": "code"
  },
  {
   "name": "chrome",
   "codepoint": 62987,
-  "file": "/Users/areias/.config/nvim/assets/icons/chrome.svg"
+  "icon": "globe"
  },
  {
   "name": "compound",
   "codepoint": 62988,
-  "file": "/Users/areias/.config/nvim/assets/icons/compound.svg"
+  "icon": "link"
  },
  {
   "name": "find_file",
   "codepoint": 62989,
-  "file": "/Users/areias/.config/nvim/assets/icons/find_file.svg"
+  "icon": "magnifying-glass"
  },
  {
   "name": "live_grep",
   "codepoint": 62990,
-  "file": "/Users/areias/.config/nvim/assets/icons/live_grep.svg"
+  "icon": "binoculars"
  },
  {
   "name": "recent_files",
   "codepoint": 62991,
-  "file": "/Users/areias/.config/nvim/assets/icons/recent_files.svg"
+  "icon": "clock-rotate-left"
  },
  {
   "name": "browse",
   "codepoint": 62992,
-  "file": "/Users/areias/.config/nvim/assets/icons/browse.svg"
+  "icon": "folder-open"
  },
  {
   "name": "settings",
   "codepoint": 62993,
-  "file": "/Users/areias/.config/nvim/assets/icons/settings.svg"
+  "icon": "gear"
  },
  {
   "name": "mason",
   "codepoint": 62994,
-  "file": "/Users/areias/.config/nvim/assets/icons/mason.svg"
+  "icon": "toolbox"
  },
  {
   "name": "lazy",
   "codepoint": 62995,
-  "file": "/Users/areias/.config/nvim/assets/icons/lazy.svg"
+  "icon": "plug"
  },
  {
   "name": "quit",
   "codepoint": 62996,
-  "file": "/Users/areias/.config/nvim/assets/icons/quit.svg"
+  "icon": "power-off"
  },
  {
   "name": "bolt",
   "codepoint": 62997,
-  "file": "/Users/areias/.config/nvim/assets/icons/bolt.svg"
+  "icon": "bolt"
  },
  {
   "name": "modified",
   "codepoint": 62998,
-  "file": "/Users/areias/.config/nvim/assets/icons/modified.svg"
+  "icon": "pen"
  },
  {
   "name": "readonly",
   "codepoint": 62999,
-  "file": "/Users/areias/.config/nvim/assets/icons/readonly.svg"
+  "icon": "lock"
  },
  {
   "name": "file",
   "codepoint": 63000,
-  "file": "/Users/areias/.config/nvim/assets/icons/file.svg"
+  "icon": "file"
  },
  {
   "name": "folder",
   "codepoint": 63001,
-  "file": "/Users/areias/.config/nvim/assets/icons/folder.svg"
+  "icon": "folder"
  },
  {
   "name": "check",
   "codepoint": 63002,
-  "file": "/Users/areias/.config/nvim/assets/icons/check.svg"
+  "icon": "check"
  },
  {
   "name": "cross",
   "codepoint": 63003,
-  "file": "/Users/areias/.config/nvim/assets/icons/cross.svg"
+  "icon": "xmark"
  },
  {
   "name": "terminal",
   "codepoint": 63004,
-  "file": "/Users/areias/.config/nvim/assets/icons/terminal.svg"
+  "icon": "terminal"
  },
  {
   "name": "chevron_right",
   "codepoint": 63005,
-  "file": "/Users/areias/.config/nvim/assets/icons/chevron_right.svg"
+  "icon": "chevron-right"
  },
  {
   "name": "chevron_down",
   "codepoint": 63006,
-  "file": "/Users/areias/.config/nvim/assets/icons/chevron_down.svg"
+  "icon": "chevron-down"
  },
  {
   "name": "current_frame",
   "codepoint": 63007,
-  "file": "/Users/areias/.config/nvim/assets/icons/current_frame.svg"
+  "icon": "angles-right"
  },
  {
   "name": "branch",
   "codepoint": 63008,
-  "file": "/Users/areias/.config/nvim/assets/icons/branch.svg"
+  "icon": "code-branch"
  }
 ]

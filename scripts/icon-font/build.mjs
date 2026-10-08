@@ -1,14 +1,15 @@
-// Build an icon-only TTF from SVGs. Usage: node build.mjs <map.json> <out.ttf>
+// Build an icon-only TTF from Font Awesome SVGs. Usage: node build.mjs <map.json> <out.ttf> <font-awesome-solid-dir>
 // (JetBrains Mono advance), scaled to 540 units and seated on the baseline.
 import fs from "node:fs"; import path from "node:path"; import { Readable } from "node:stream";
 import { SVGIcons2SVGFontStream } from "svgicons2svgfont"; import svg2ttf from "svg2ttf";
-const [,, mapFile, outFile] = process.argv;
-const map = JSON.parse(fs.readFileSync(mapFile, "utf8")); // [{name, codepoint, file}]
+const [,, mapFile, outFile, svgDir] = process.argv;
+if (!svgDir) { console.error("usage: node build.mjs <map.json> <out.ttf> <font-awesome-solid-dir>"); process.exit(1); }
+const map = JSON.parse(fs.readFileSync(mapFile, "utf8")); // [{name, codepoint, icon}]
 const font = new SVGIcons2SVGFontStream({ fontName: "ConfigIcons", fontHeight: 1000, descent: 250, normalize: false, log: () => {} });
 let out = ""; font.on("data", d => out += d);
 const done = new Promise((res, rej) => { font.on("end", res); font.on("error", rej); });
-for (const { name, codepoint, file } of map) {
-  const raw = fs.readFileSync(file, "utf8");
+for (const { name, codepoint, icon } of map) {
+  const raw = fs.readFileSync(path.join(svgDir, `${icon}.svg`), "utf8");
   const vb = raw.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number); const [vx, vy, vw, vh] = vb;
   const inner = raw.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "").replace(/<!--[\s\S]*?-->/g, "");
   const size = 540, scale = size / Math.max(vw, vh);

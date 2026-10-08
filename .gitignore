@@ -2,3 +2,4 @@ lazy-lock.json
 .netrwhist
 
 node_modules/
+assets/icons/*.svg
