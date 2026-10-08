@@ -1,1 +1,1 @@
-require("editor.options")
+require("core")

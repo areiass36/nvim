@@ -1,0 +1,7 @@
+{
+  "name": "icon-font",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node build.mjs ../../assets/icons/map.json ../../assets/fonts/ConfigIcons.ttf" },
+  "dependencies": { "svg2ttf": "^6.0.3", "svgicons2svgfont": "^15.0.0" }
+}
