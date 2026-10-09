@@ -1,5 +1,6 @@
 -- Download and extract a release archive with curl + tar. Both ship with
 -- macOS, Linux and Windows 10+; the macOS and Windows tar also open .zip files.
+local platform = require("core.platform")
 local tools = require("tools")
 
 local M = {}
@@ -33,8 +34,14 @@ function M.archive(name, url, destination, strip_components, on_done, members)
 	local archive = temp_dir .. "/" .. url:match("[^/]+$")
 
 	tools.notify("downloading " .. name .. "...")
+	local curl = { "curl", "-fsSL", "-o", archive, url }
+	if platform.is_windows then
+		-- Corporate TLS inspection (e.g. Cloudflare WARP) serves certificates
+		-- without revocation info, which Windows curl (schannel) rejects.
+		table.insert(curl, 2, "--ssl-revoke-best-effort")
+	end
 	vim.system(
-		{ "curl", "-fsSL", "-o", archive, url },
+		curl,
 		{},
 		vim.schedule_wrap(function(download)
 			if download.code ~= 0 then

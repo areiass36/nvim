@@ -88,14 +88,10 @@ local function build_report()
 	row(ok, "ripgrep", ok and path or "not yet (downloads on startup)")
 	ok, path = executable(netcoredbg.path)
 	row(ok, "netcoredbg (.NET debugger)", ok and path or netcoredbg.path .. " (not yet)")
-	ok, path = executable(dotnet.roslyn)
-	row(ok, "roslyn (C# LSP)", ok and path or dotnet.roslyn .. " (installs when a .cs file is opened)")
-	ok, path = executable(dotnet.ilspy)
-	row(
-		ok,
-		"ilspycmd (.NET decompiler)",
-		ok and path or dotnet.ilspy .. " (installs on the first gd into a .NET type)"
-	)
+	local roslyn = dotnet.roslyn()
+	row(roslyn ~= nil, "roslyn (C# LSP)", roslyn or "installs when a .cs file is opened")
+	local ilspy = dotnet.ilspy()
+	row(ilspy ~= nil, "ilspycmd (.NET decompiler)", ilspy or "installs on the first gd into a .NET type")
 	local decompiled = vim.fn.glob(tools.tools_dir .. "/ilspy-src/*/*/*/.ilspy-done", true, true)
 	row(true, "decompiled assemblies", #decompiled .. " cached")
 	ok, path = executable("tree-sitter")

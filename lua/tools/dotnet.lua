@@ -52,28 +52,45 @@ local function install_tool(package, directory, extra_args, on_done)
 	)
 end
 
-local function ensure_tool(package, executable, extra_args)
+--- Launchable path of an installed tool, or nil. .NET SDKs before 10 write an
+--- exe shim at <dir>/<name>; SDK 10 writes a .cmd shim on Windows, which libuv
+--- cannot spawn, so fall back to the real executable inside .store.
+local function find_tool(directory, executable)
+	local shim = directory .. "/" .. executable .. platform.exe_suffix
+	if vim.fn.executable(shim) == 1 then
+		return shim
+	end
+	return vim.fn.glob(directory .. "/.store/**/" .. executable .. ".exe", true, true)[1]
+end
+
+local function ensure_tool(package, find, directory, extra_args)
 	return function(on_done)
 		on_done = on_done or function() end
-		if vim.fn.executable(executable) == 1 then
+		if find() then
 			return on_done(true)
 		end
 		if vim.fn.executable("dotnet") == 0 then
 			return on_done(false) -- no .NET SDK, no C# support
 		end
-		install_tool(package, vim.fn.fnamemodify(executable, ":h"), extra_args, function(ok)
-			on_done(ok and vim.fn.executable(executable) == 1)
+		install_tool(package, directory, extra_args, function(ok)
+			on_done(ok and find() ~= nil)
 		end)
 	end
 end
 
 -- Microsoft's C# language server (the one used by VS Code). Not in Mason.
-M.roslyn = tools.tools_dir .. "/roslyn/roslyn-language-server" .. platform.exe_suffix
-M.ensure_roslyn = ensure_tool("roslyn-language-server", M.roslyn, { "--prerelease" })
+local roslyn_dir = tools.tools_dir .. "/roslyn"
+function M.roslyn()
+	return find_tool(roslyn_dir, "roslyn-language-server")
+end
+M.ensure_roslyn = ensure_tool("roslyn-language-server", M.roslyn, roslyn_dir, { "--prerelease" })
 
 -- ILSpy command line decompiler, used to read the implementation of .NET types.
-M.ilspy = tools.tools_dir .. "/ilspy/ilspycmd" .. platform.exe_suffix
-M.ensure_ilspy = ensure_tool("ilspycmd", M.ilspy, {})
+local ilspy_dir = tools.tools_dir .. "/ilspy"
+function M.ilspy()
+	return find_tool(ilspy_dir, "ilspycmd")
+end
+M.ensure_ilspy = ensure_tool("ilspycmd", M.ilspy, ilspy_dir, {})
 
 --- Root of a .NET installation that contains the Microsoft.NETCore.App runtime
 --- of the given major version. With asdf/mise every SDK lives in its own

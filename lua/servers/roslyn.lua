@@ -25,7 +25,8 @@ local function root_dir(bufnr, on_dir)
 end
 
 vim.lsp.config("roslyn_ls", {
-	cmd = { dotnet.roslyn, "--logLevel", "Warning", "--extensionLogDirectory", log_dir, "--stdio" },
+	-- cmd is filled in by ensure_roslyn below: the binary's real path is only
+	-- known once the tool is installed (.NET 10 buries it inside .store).
 	-- Roslyn registers its capabilities for language "csharp". Sending the
 	-- filetype ("cs") as languageId makes the selector miss and gd/gr fail.
 	get_language_id = function()
@@ -63,6 +64,9 @@ dotnet.ensure_roslyn(function(ok)
 	if not ok then
 		return
 	end
+	vim.lsp.config("roslyn_ls", {
+		cmd = { dotnet.roslyn(), "--logLevel", "Warning", "--extensionLogDirectory", log_dir, "--stdio" },
+	})
 	vim.lsp.enable("roslyn_ls")
 	for _, buf in ipairs(vim.api.nvim_list_bufs()) do
 		if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype == "cs" then

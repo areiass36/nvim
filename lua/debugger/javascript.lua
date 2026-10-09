@@ -309,7 +309,8 @@ function M.setup()
 			type = "server",
 			host = "localhost",
 			port = "${port}",
-			executable = { command = "node", args = { server, "${port}" } },
+			-- See python.lua: detached adapters pop console windows on Windows.
+			executable = { command = "node", args = { server, "${port}" }, detached = false },
 		}
 	end
 

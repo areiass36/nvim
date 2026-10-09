@@ -46,7 +46,7 @@ function M.ensure_project(info, dll, on_done)
 	local started = vim.uv.now()
 
 	vim.system(
-		{ dotnet.ilspy, "-p", "-o", dir, dll },
+		{ dotnet.ilspy(), "-p", "-o", dir, dll },
 		{ text = true },
 		vim.schedule_wrap(function(result)
 			local callbacks = generating[dir]
@@ -96,7 +96,7 @@ function M.find_implementation(info, on_found)
 			)
 		end
 		vim.system(
-			{ dotnet.ilspy, "-t", info.full_type, dll },
+			{ dotnet.ilspy(), "-t", info.full_type, dll },
 			{ text = true },
 			vim.schedule_wrap(function(result)
 				local output = result.stdout or ""

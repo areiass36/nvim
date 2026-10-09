@@ -99,7 +99,13 @@ function M.setup()
 			if not ok then
 				return notify("netcoredbg is not available", vim.log.levels.ERROR)
 			end
-			callback({ type = "executable", command = netcoredbg.path, args = { "--interpreter=vscode" } })
+			callback({
+				type = "executable",
+				command = netcoredbg.path,
+				args = { "--interpreter=vscode" },
+				-- See python.lua: detached adapters pop console windows on Windows.
+				options = { detached = false },
+			})
 		end)
 	end
 

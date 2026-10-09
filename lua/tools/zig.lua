@@ -21,6 +21,16 @@ local function activate()
 	-- tree-sitter (and the cc crate behind it) honour CC/CXX, including arguments.
 	vim.env.CC = "zig cc"
 	vim.env.CXX = "zig c++"
+	-- The cc crate appends a Rust-style --target (x86_64-pc-windows-msvc) that
+	-- zig cannot parse. CFLAGS/CXXFLAGS land after it on the command line and
+	-- the last --target wins, so override it with zig's own target spelling.
+	local os_name, arch = platform.detect()
+	local target = TARGETS[os_name] and TARGETS[os_name][arch]
+	if target then
+		local flag = "--target=" .. target .. (os_name == "windows" and "-gnu" or "")
+		vim.env.CFLAGS = vim.env.CFLAGS and (vim.env.CFLAGS .. " " .. flag) or flag
+		vim.env.CXXFLAGS = vim.env.CXXFLAGS and (vim.env.CXXFLAGS .. " " .. flag) or flag
+	end
 end
 
 --- Put an already downloaded zig on PATH. Called before plugins load.

@@ -3,6 +3,9 @@
 local M = {}
 
 function M.setup()
+	-- TODO(temporary): full protocol logging to diagnose a Windows issue;
+	-- remove once stable. Log: stdpath("data")/dap.log
+	require("dap").set_log_level("DEBUG")
 	require("debugger.ui").setup()
 	require("debugger.dotnet").setup()
 	require("debugger.python").setup()
