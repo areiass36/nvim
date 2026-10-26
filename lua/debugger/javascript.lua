@@ -3,6 +3,7 @@ local dap = require("dap")
 local icons = require("core.icons")
 local platform = require("core.platform")
 local tools = require("tools")
+local wait = require("debugger.wait")
 
 local M = {}
 
@@ -35,31 +36,6 @@ local function package_dir()
 end
 
 -- --------------------------------------------------------------- helpers
---- Wait (inside nvim-dap's coroutine) until a local TCP port accepts connections.
-local function wait_for_port(port, timeout_ms)
-	local co = coroutine.running()
-	local deadline = vim.uv.now() + timeout_ms
-	local function attempt()
-		local tcp = vim.uv.new_tcp()
-		tcp:connect("127.0.0.1", port, function(err)
-			tcp:close()
-			if not err then
-				return vim.schedule(function()
-					coroutine.resume(co, true)
-				end)
-			end
-			if vim.uv.now() > deadline then
-				return vim.schedule(function()
-					coroutine.resume(co, false)
-				end)
-			end
-			vim.defer_fn(attempt, 250)
-		end)
-	end
-	attempt()
-	return coroutine.yield()
-end
-
 --- PID listening on a local TCP port (nil when nobody is, or without lsof).
 local function port_owner(port)
 	if vim.fn.executable("lsof") == 0 then
@@ -140,7 +116,7 @@ local function inspector_port_for_picked_process()
 	if not owner then
 		vim.uv.kill(pid, "sigusr1")
 	end
-	if not wait_for_port(INSPECTOR_PORT, 4000) then
+	if not wait.for_port(INSPECTOR_PORT, 4000) then
 		notify(
 			('process %d did not open the inspector on port %d. Is it really the node process of your application (e.g. "...preflight.cjs ... server.ts")? Is it running?'):format(
 				pid,
@@ -155,7 +131,7 @@ end
 
 local function require_listening(port, hint)
 	return function()
-		if not wait_for_port(port, 1000) then
+		if not wait.for_port(port, 1000) then
 			notify(("nothing is listening on 127.0.0.1:%d. %s"):format(port, hint), vim.log.levels.ERROR)
 			return dap.ABORT
 		end
@@ -260,6 +236,8 @@ local node_configurations = {
 			return platform.is_windows and pick_node_process() or nil
 		end,
 		port = inspector_port_for_picked_process,
+		-- tsx watch and nodemon replace the process on every reload.
+		restart = true,
 		cwd = "${workspaceFolder}",
 		sourceMaps = true,
 		skipFiles = SKIP_FILES,
@@ -272,7 +250,44 @@ local node_configurations = {
 			INSPECTOR_PORT,
 			"Start the process with --inspect (node --inspect ... or tsx --inspect ...)."
 		),
+		restart = true,
 		cwd = "${workspaceFolder}",
+		sourceMaps = true,
+		skipFiles = SKIP_FILES,
+	},
+}
+
+-- Vitest runs every test file in a forked child, where the breakpoints live:
+-- js-debug reaches it through autoAttachChildProcesses. A single fork
+-- (--no-file-parallelism) keeps stepping in one place.
+local VITEST_ARGS = { "vitest", "run", "--no-file-parallelism" }
+
+local function vitest_args_for_current_file()
+	return vim.list_extend(vim.deepcopy(VITEST_ARGS), { vim.fn.expand("%:p") })
+end
+
+local test_configurations = {
+	{
+		type = "pwa-node",
+		request = "launch",
+		name = icons.node .. "  Vitest · current file",
+		cwd = package_dir,
+		runtimeExecutable = "npx",
+		runtimeArgs = vitest_args_for_current_file,
+		autoAttachChildProcesses = true,
+		console = "integratedTerminal",
+		sourceMaps = true,
+		skipFiles = SKIP_FILES,
+	},
+	{
+		type = "pwa-node",
+		request = "launch",
+		name = icons.node .. "  Vitest · current package",
+		cwd = package_dir,
+		runtimeExecutable = "npx",
+		runtimeArgs = VITEST_ARGS,
+		autoAttachChildProcesses = true,
+		console = "integratedTerminal",
 		sourceMaps = true,
 		skipFiles = SKIP_FILES,
 	},
@@ -314,7 +329,9 @@ function M.setup()
 		}
 	end
 
-	local all = vim.list_extend(vim.deepcopy(node_configurations), browser_configurations)
+	local all = vim.deepcopy(node_configurations)
+	vim.list_extend(all, test_configurations)
+	vim.list_extend(all, browser_configurations)
 	for _, filetype in ipairs({ "javascript", "typescript", "javascriptreact", "typescriptreact" }) do
 		dap.configurations[filetype] = all
 	end

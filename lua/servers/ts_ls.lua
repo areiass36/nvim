@@ -13,5 +13,14 @@ vim.lsp.config("ts_ls", {
 			},
 		},
 	},
-	filetypes = { "javascript", "typescript", "vue" },
+	-- The lspconfig defaults (lsp/ts_ls.lua) plus "vue". Keep both React
+	-- variants: .tsx maps to "typescriptreact" and .jsx to "javascriptreact",
+	-- and dropping them leaves those files with no server attached.
+	filetypes = {
+		"javascript",
+		"javascriptreact",
+		"typescript",
+		"typescriptreact",
+		"vue",
+	},
 })

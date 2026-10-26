@@ -11,6 +11,7 @@ function M.setup()
 	require("debugger.python").setup()
 	require("debugger.javascript").setup()
 	require("debugger.launch_json").setup()
+	require("debugger.breakpoints").setup()
 	require("debugger.keymaps").setup()
 end
 

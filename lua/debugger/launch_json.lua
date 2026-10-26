@@ -6,8 +6,15 @@
 --   * "compounds" run every member configuration as a parallel session.
 local dap = require("dap")
 local icons = require("core.icons")
+local wait = require("debugger.wait")
 
 local M = {}
+
+local DEV_SERVER_TIMEOUT_MS = 180000
+
+local function notify(message, level)
+	vim.notify("[dap] " .. message, level or vim.log.levels.INFO)
+end
 
 --- Split a command line, honouring single and double quotes.
 local function shell_split(command)
@@ -57,6 +64,31 @@ local function convert_node_terminal(config)
 	config.command = nil
 end
 
+local function url_port(url)
+	local port = url:match("^https?://[^/:]+:(%d+)")
+	if port then
+		return tonumber(port)
+	end
+	return url:match("^https://") and 443 or 80
+end
+
+--- Browsers in a compound start next to the dev server they must open, and
+--- Vite only listens once its pre-build is done. Waiting here is what VS Code
+--- does with serverReadyAction, which nvim-dap has no equivalent for.
+local function wait_for_dev_server(url)
+	return function()
+		local port = url_port(url)
+		if not wait.for_port(port, DEV_SERVER_TIMEOUT_MS) then
+			notify(
+				("no dev server on port %d after %ds."):format(port, DEV_SERVER_TIMEOUT_MS / 1000),
+				vim.log.levels.ERROR
+			)
+			return dap.ABORT
+		end
+		return url
+	end
+end
+
 local function normalize(config)
 	if config.type == "node-terminal" and config.command then
 		convert_node_terminal(config)
@@ -65,6 +97,9 @@ local function normalize(config)
 		config.type = "pwa-node"
 	elseif config.type == "chrome" then
 		config.type = "pwa-chrome"
+	end
+	if config.type == "pwa-chrome" and config.request == "launch" and type(config.url) == "string" then
+		config.url = wait_for_dev_server(config.url)
 	end
 	if config.preLaunchTask then
 		config.name = config.name .. "  (without preLaunchTask: " .. config.preLaunchTask .. ")"
@@ -124,8 +159,9 @@ function M.setup()
 			normalize(config)
 			by_name[config.name] = config
 		end
-		for _, compound in ipairs(read_compounds(bufnr)) do
-			local config = compound_configuration(compound, by_name)
+		local compounds = read_compounds(bufnr)
+		for index = #compounds, 1, -1 do
+			local config = compound_configuration(compounds[index], by_name)
 			if config then
 				table.insert(configs, 1, config)
 			end

@@ -18,6 +18,22 @@ return {
 
 		telescope.setup({
 			defaults = {
+				-- Hidden entries belong to the project just as much as the rest: .github,
+				-- .editorconfig, .env.example, and on Windows everything under AppData,
+				-- which is hidden by file attribute instead of a leading dot. rg's
+				-- --hidden covers both conventions. Only .git stays out: a few thousand
+				-- objects and refs would drown every result.
+				vimgrep_arguments = {
+					"rg",
+					"--color=never",
+					"--no-heading",
+					"--with-filename",
+					"--line-number",
+					"--column",
+					"--smart-case",
+					"--hidden",
+					"--glob=!**/.git/*",
+				},
 				layout_strategy = "horizontal",
 				layout_config = {
 					width = function()
@@ -34,10 +50,37 @@ return {
 						end,
 					},
 				},
-				file_ignore_patterns = { "node_modules", "bin", "obj", ".git" },
+				-- The patterns are Lua patterns matched against the whole path, so a bare
+				-- ".git" also swallowed .gitignore and .github/: anchor it to the folder.
+				file_ignore_patterns = { "node_modules", "bin", "obj", "%.git[/\\]" },
+			},
+			-- file_ignore_patterns applies to every picker that has a file attached,
+			-- including the lsp_ ones: a definition inside node_modules (any npm
+			-- dependency) or obj/ (generated C#) got filtered out and the picker
+			-- reported "No Definitions found". Telescope documents this trap in
+			-- config.lua. Jumping into a dependency is the point of gd, so the
+			-- lsp_ pickers opt out of the ignore list.
+			pickers = {
+				lsp_definitions = { file_ignore_patterns = {} },
+				lsp_references = { file_ignore_patterns = {} },
+				lsp_implementations = { file_ignore_patterns = {} },
+				lsp_type_definitions = { file_ignore_patterns = {} },
+				-- Telescope appends --hidden on its own; the command is the rg default it
+				-- would build anyway, plus the .git exclusion. rg is always available:
+				-- tools/ripgrep.lua downloads it when the machine has none.
+				find_files = {
+					hidden = true,
+					find_command = { "rg", "--files", "--color", "never", "--glob", "!**/.git/*" },
+				},
 			},
 			extensions = {
-				file_browser = { dir_icon = require("core.icons").folder },
+				file_browser = {
+					dir_icon = require("core.icons").folder,
+					-- Dotfiles in both modes: the file list and the folder-only list (<C-f>).
+					-- The browser reads the directory itself and only counts a leading dot as
+					-- hidden, so AppData was already showing up there.
+					hidden = { file_browser = true, folder_browser = true },
+				},
 				["ui-select"] = {
 					require("telescope.themes").get_dropdown({
 						layout_config = { width = 0.7, height = 0.45 },

@@ -1,5 +1,6 @@
 local dap = require("dap")
 local dapui = require("dapui")
+local play = require("debugger.play")
 local ui = require("debugger.ui")
 
 local M = {}
@@ -10,11 +11,12 @@ function M.setup()
 	end
 
 	-- Flow (F-keys and leader alternatives, since macOS reserves some F-keys)
-	map("n", "<F5>", dap.continue, "Debug: continue")
+	map("n", "<F5>", play.start, "Debug: play (project configuration) or continue")
 	map("n", "<F10>", dap.step_over, "Debug: step over")
 	map("n", "<F11>", dap.step_into, "Debug: step into")
 	map("n", "<F12>", dap.step_out, "Debug: step out")
-	map("n", "<leader>dc", dap.continue, "Debug: continue")
+	map("n", "<leader>dp", play.start, "Debug: play (project configuration) or continue")
+	map("n", "<leader>dc", dap.continue, "Debug: continue (pick a configuration)")
 	map("n", "<leader>do", dap.step_over, "Debug: step over")
 	map("n", "<leader>di", dap.step_into, "Debug: step into")
 	map("n", "<leader>dO", dap.step_out, "Debug: step out")

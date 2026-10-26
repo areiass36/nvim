@@ -18,7 +18,16 @@ return {
 		end
 
 		cmp.setup({
-			sources = { { name = "nvim_lsp" } },
+			-- minuet is the AI source (lsp/minuet.lua). It sits in a second
+			-- group so LSP items always rank above it: the LSP knows your types,
+			-- the model is guessing.
+			sources = {
+				{ name = "nvim_lsp", group_index = 1 },
+				{ name = "minuet", group_index = 2 },
+			},
+			-- A model answers in a second or two, far slower than any other
+			-- source; the default 500ms would drop every AI item.
+			performance = { fetching_timeout = 2000 },
 			mapping = {
 				["<C-y>"] = cmp.mapping.confirm({ select = false }),
 				["<C-e>"] = cmp.mapping.abort(),
