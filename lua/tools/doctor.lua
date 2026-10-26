@@ -107,6 +107,14 @@ local function build_report()
 		end
 	end
 
+	section("Databases")
+	local db_ok, db_doctor = pcall(require, "db.doctor")
+	if db_ok then
+		vim.list_extend(lines, db_doctor.report())
+	else
+		row(false, "db module", "not loaded")
+	end
+
 	section("Treesitter")
 	local treesitter_ok, treesitter = pcall(require, "nvim-treesitter")
 	row(

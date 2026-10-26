@@ -1,0 +1,318 @@
+-- The result window.
+--
+-- A scratch buffer with its own filetype, so the editor-wide autocommands leave
+-- it alone: core/autocmds.lua formats every buffer through the LSP on
+-- InsertLeave, and the treesitter FileType hook sets an indentexpr. Neither has
+-- any business in a table of values.
+--
+-- The rendered text is only a picture of the result: yanking and exporting read
+-- the untruncated value out of state.rows.
+local config = require("db.config")
+local db = require("db")
+local layout = require("db.grid.layout")
+local value_module = require("db.value")
+
+local M = {}
+
+local NAMESPACE = vim.api.nvim_create_namespace("db_grid")
+-- The current cell gets its own namespace so moving the cursor does not have to
+-- repaint the table's highlights.
+local CELL_NAMESPACE = vim.api.nvim_create_namespace("db_grid_cell")
+local states = {}
+
+--- @class db.GridState
+--- @field result table
+--- @field columns string[]
+--- @field rows any[][]
+--- @field spans table
+--- @field layout db.Layout
+--- @field row integer current data row, 1-based
+--- @field column integer current column, 1-based
+--- @field origin_buf integer the query buffer this came from
+
+function M.state(bufnr)
+	return states[bufnr or vim.api.nvim_get_current_buf()]
+end
+
+local function footer(state)
+	local result = state.result
+	local connection = result.connection or {}
+	local offset = result.offset or 0
+	local range = ("%d-%d"):format(offset + 1, offset + #state.rows)
+	if #state.rows == 0 then
+		range = "no rows"
+	end
+	local parts = {
+		("%s [%s]"):format(connection.name or "?", connection.driver or "?"),
+		range .. (result.has_more and " (more)" or ""),
+		("%d ms"):format(result.elapsed_ms or 0),
+	}
+	if state.has_binary then
+		parts[#parts + 1] = "binary column: select encode(col,'hex') to read it"
+	end
+	return table.concat(parts, "  ·  ")
+end
+
+local function render(bufnr)
+	local state = states[bufnr]
+	if not state then
+		return
+	end
+
+	local computed = layout.compute(state.columns, state.rows, {})
+	local lines, spans, nulls = layout.render(computed, state.columns, state.rows, {})
+	state.layout = computed
+	state.spans = spans
+
+	state.has_binary = false
+	for _, row in ipairs(state.rows) do
+		for _, value in ipairs(row) do
+			if layout.looks_binary(value) then
+				state.has_binary = true
+				break
+			end
+		end
+		if state.has_binary then
+			break
+		end
+	end
+
+	table.insert(lines, "")
+	table.insert(lines, footer(state))
+
+	vim.bo[bufnr].modifiable = true
+	vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+	vim.bo[bufnr].modifiable = false
+
+	vim.api.nvim_buf_clear_namespace(bufnr, NAMESPACE, 0, -1)
+	vim.api.nvim_buf_set_extmark(bufnr, NAMESPACE, 0, 0, { end_row = 1, hl_group = "Title", hl_eol = false })
+	vim.api.nvim_buf_set_extmark(bufnr, NAMESPACE, 1, 0, { end_row = 2, hl_group = "Comment" })
+	for _, position in ipairs(nulls) do
+		local line_spans = spans[position[1]]
+		local span = line_spans and line_spans[position[2]]
+		if span then
+			vim.api.nvim_buf_set_extmark(bufnr, NAMESPACE, position[1] - 1, span[1], {
+				end_col = span[2],
+				hl_group = "Comment",
+			})
+		end
+	end
+	vim.api.nvim_buf_set_extmark(bufnr, NAMESPACE, #lines - 1, 0, { end_row = #lines, hl_group = "Comment" })
+
+	M.highlight_cell(bufnr)
+end
+
+--- Underline the cell the cursor is in, so "which column am I on" is visible
+--- in a wide table.
+function M.highlight_cell(bufnr)
+	local state = states[bufnr]
+	if not state then
+		return
+	end
+	vim.api.nvim_buf_clear_namespace(bufnr, CELL_NAMESPACE, 0, -1)
+	local line = state.row + 2
+	local span = state.spans[line] and state.spans[line][state.column]
+	if not span then
+		return
+	end
+	pcall(vim.api.nvim_buf_set_extmark, bufnr, CELL_NAMESPACE, line - 1, span[1], {
+		end_col = span[2],
+		hl_group = "Visual",
+		priority = 150,
+	})
+end
+
+--- Move the cursor to the current cell.
+function M.focus_cell(bufnr, winid)
+	local state = states[bufnr]
+	if not state then
+		return
+	end
+	local line = state.row + 2
+	local span = state.spans[line] and state.spans[line][state.column]
+	if span and vim.api.nvim_win_is_valid(winid or 0) then
+		pcall(vim.api.nvim_win_set_cursor, winid or 0, { line, span[1] })
+	end
+	M.highlight_cell(bufnr)
+end
+
+--- Work out which cell the cursor is sitting in after a plain motion.
+function M.sync_from_cursor(bufnr, winid)
+	local state = states[bufnr]
+	if not state then
+		return
+	end
+	local cursor = vim.api.nvim_win_get_cursor(winid or 0)
+	local line, column_byte = cursor[1], cursor[2]
+	if line <= 2 or line > #state.rows + 2 then
+		return
+	end
+	state.row = line - 2
+	local line_spans = state.spans[line] or {}
+	for index, span in ipairs(line_spans) do
+		if column_byte < span[2] then
+			state.column = index
+			break
+		end
+		state.column = index
+	end
+	M.highlight_cell(bufnr)
+end
+
+--- @return any the stored value, not the rendered one
+function M.cell_value(bufnr)
+	local state = states[bufnr]
+	if not state then
+		return nil
+	end
+	local row = state.rows[state.row]
+	return row and row[state.column]
+end
+
+local function find_window(bufnr)
+	for _, winid in ipairs(vim.api.nvim_list_wins()) do
+		if vim.api.nvim_win_get_buf(winid) == bufnr then
+			return winid
+		end
+	end
+	return nil
+end
+
+--- Show a result, reusing the window that already holds one.
+--- @return integer bufnr
+function M.show(result, context)
+	context = context or {}
+	local bufnr = M.current_buf()
+	local winid
+
+	if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+		winid = find_window(bufnr)
+	else
+		bufnr = vim.api.nvim_create_buf(false, true)
+		vim.bo[bufnr].buftype = "nofile"
+		vim.bo[bufnr].bufhidden = "hide"
+		vim.bo[bufnr].swapfile = false
+		vim.bo[bufnr].filetype = "dbresult"
+		vim.api.nvim_buf_set_name(bufnr, "db://result")
+	end
+
+	if not winid then
+		local origin = vim.api.nvim_get_current_win()
+		vim.cmd("botright split")
+		winid = vim.api.nvim_get_current_win()
+		vim.api.nvim_win_set_height(winid, math.max(10, math.floor(vim.o.lines * 0.4)))
+		vim.api.nvim_win_set_buf(winid, bufnr)
+		vim.wo[winid].wrap = false
+		vim.wo[winid].number = false
+		vim.wo[winid].relativenumber = false
+		vim.wo[winid].cursorline = false
+		vim.api.nvim_set_current_win(origin)
+	end
+
+	states[bufnr] = {
+		result = result,
+		columns = result.columns or {},
+		rows = result.rows or {},
+		documents = result.documents,
+		row = 1,
+		column = 1,
+		origin_buf = context.origin_buf,
+		statement = context.statement,
+	}
+	M.buf = bufnr
+	render(bufnr)
+	require("db.grid.navigate").attach(bufnr)
+
+	if context.focus ~= false then
+		vim.api.nvim_set_current_win(winid)
+		M.focus_cell(bufnr, winid)
+	end
+	return bufnr
+end
+
+function M.current_buf()
+	if M.buf and vim.api.nvim_buf_is_valid(M.buf) then
+		return M.buf
+	end
+	return nil
+end
+
+function M.refresh(bufnr)
+	render(bufnr or M.current_buf())
+end
+
+function M.close(bufnr)
+	bufnr = bufnr or M.current_buf()
+	if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+		states[bufnr] = nil
+		pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
+	end
+	M.buf = nil
+end
+
+--- Replace the rows in place, for paging and sorting.
+function M.set_result(bufnr, result)
+	local state = states[bufnr]
+	if not state then
+		return
+	end
+	state.result = result
+	state.columns = result.columns or {}
+	state.rows = result.rows or {}
+	state.documents = result.documents
+	state.row = 1
+	state.column = math.min(state.column, math.max(#state.columns, 1))
+	render(bufnr)
+	local winid = find_window(bufnr)
+	if winid then
+		M.focus_cell(bufnr, winid)
+	end
+end
+
+--- The whole document behind a Mongo row, which the grid flattens.
+function M.show_document(bufnr)
+	local state = states[bufnr]
+	if not state or not state.documents then
+		db.notify("no document behind this row", vim.log.levels.WARN)
+		return
+	end
+	local document = state.documents[state.row]
+	if not document then
+		return
+	end
+	local ok, encoded = pcall(vim.json.encode, document)
+	if not ok then
+		return
+	end
+	-- vim.json has no pretty printer. jq is the nicest way to get one and is
+	-- often around; without it the document is shown on a single line.
+	local pretty = { encoded }
+	if vim.fn.executable("jq") == 1 then
+		local formatted = vim.system({ "jq", "." }, { stdin = encoded, text = true }):wait()
+		if formatted.code == 0 then
+			pretty = vim.split(formatted.stdout or encoded, "\n", { trimempty = true })
+		end
+	end
+	local float = vim.api.nvim_create_buf(false, true)
+	vim.api.nvim_buf_set_lines(float, 0, -1, false, pretty)
+	vim.bo[float].filetype = "json"
+	vim.bo[float].modifiable = false
+	vim.bo[float].bufhidden = "wipe"
+	vim.api.nvim_open_win(float, true, {
+		relative = "editor",
+		row = 1,
+		col = 2,
+		width = vim.o.columns - 4,
+		height = vim.o.lines - 6,
+		border = "rounded",
+		title = " document ",
+		title_pos = "center",
+		style = "minimal",
+	})
+	vim.keymap.set("n", "q", "<cmd>close<CR>", { buffer = float, nowait = true })
+	vim.keymap.set("n", "<Esc>", "<cmd>close<CR>", { buffer = float, nowait = true })
+end
+
+M.display = value_module.display
+
+return M

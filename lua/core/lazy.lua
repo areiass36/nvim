@@ -19,6 +19,7 @@ require("lazy").setup({
 		{ import = "plugins.editor" },
 		{ import = "plugins.lsp" },
 		{ import = "plugins.dap" },
+		{ import = "plugins.db" },
 	},
 	-- luarocks would need Lua 5.1 and a compiler; no plugin here uses it.
 	rocks = { enabled = false },

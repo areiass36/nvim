@@ -6,6 +6,65 @@ local tools = require("tools")
 local M = {}
 
 local in_flight = {}
+local gnu_tar = nil
+
+--- GNU tar needs --wildcards before a pattern; bsdtar (macOS, Windows) matches
+--- patterns on its own and does not know the flag.
+local function wildcards_flag()
+	if gnu_tar == nil then
+		local version = vim.system({ "tar", "--version" }, { text = true }):wait()
+		gnu_tar = ((version.stdout or "") .. (version.stderr or "")):find("GNU tar") ~= nil
+	end
+	return gnu_tar and { "--wildcards" } or {}
+end
+
+--- Fetch a single file, with no archive to unpack: a JDBC driver is a jar,
+--- which is the artifact itself.
+--- @param name string label for notifications and in-flight deduplication
+--- @param url string
+--- @param destination string full path of the file to write
+--- @param on_done fun(ok: boolean)
+function M.file(name, url, destination, on_done)
+	if in_flight[name] then
+		table.insert(in_flight[name], on_done)
+		return
+	end
+	in_flight[name] = { on_done }
+
+	vim.fn.mkdir(vim.fs.dirname(destination), "p")
+	-- Downloaded next to the target and moved into place, so an interrupted
+	-- download never leaves something that looks installed.
+	local partial = destination .. ".part"
+	local curl = { "curl", "-fsSL", "-o", partial, url }
+	if platform.is_windows then
+		table.insert(curl, 2, "--ssl-revoke-best-effort")
+	end
+
+	vim.system(
+		curl,
+		{},
+		vim.schedule_wrap(function(result)
+			local callbacks = in_flight[name]
+			in_flight[name] = nil
+			local ok = result.code == 0
+			if ok then
+				ok = vim.uv.fs_rename(partial, destination) ~= nil
+			end
+			if not ok then
+				pcall(vim.fn.delete, partial)
+				tools.notify(
+					("failed to download %s: %s"):format(name, result.stderr or ""),
+					vim.log.levels.ERROR
+				)
+			else
+				tools.notify(name .. " ready")
+			end
+			for _, callback in ipairs(callbacks) do
+				callback(ok)
+			end
+		end)
+	)
+end
 
 --- @param name string label for notifications and in-flight deduplication
 --- @param url string
@@ -55,6 +114,12 @@ function M.archive(name, url, destination, strip_components, on_done, members)
 			local tar = { "tar", "-xf", archive, "-C", destination }
 			if strip_components > 0 then
 				table.insert(tar, "--strip-components=" .. strip_components)
+			end
+			if members and #members > 0 then
+				-- Release archives often carry a licence and a readme beside the
+				-- binary; without this they are extracted into bin/ as well.
+				vim.list_extend(tar, wildcards_flag())
+				vim.list_extend(tar, members)
 			end
 			vim.fn.mkdir(destination, "p")
 
