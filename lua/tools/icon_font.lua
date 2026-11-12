@@ -14,7 +14,10 @@ local FONT_NAME = "ConfigIcons"
 local ITERM_PROFILES_DIR = vim.env.HOME .. "/Library/Application Support/iTerm2/DynamicProfiles"
 
 M.source = vim.fn.stdpath("config") .. "/assets/fonts/" .. FONT_FILE
-M.target = fonts.user_font_dir() .. "/" .. FONT_FILE
+-- Not simply the font directory plus the file name: on Windows the installed
+-- copy is named after its contents, because the one in use cannot be replaced.
+-- See tools/fonts.lua.
+M.target = fonts.installed_path(M.source)
 
 local function is_installed()
 	local source, target = vim.uv.fs_stat(M.source), vim.uv.fs_stat(M.target)
@@ -91,7 +94,19 @@ function M.ensure()
 		return
 	end
 	if not is_installed() and fonts.install(M.source, FONT_NAME) then
-		tools.notify(FONT_FILE .. " installed in " .. fonts.user_font_dir())
+		-- And say what to do with that, because installing it is not enough: a
+		-- process resolves its font set when it starts, and on Windows the
+		-- installed copy is named after its contents (see tools/fonts.lua), so a
+		-- rebuilt font arrives under a name the running terminal has never heard
+		-- of while the one it is holding has just been deleted. Every glyph in
+		-- the range is a missing-glyph box until the terminal is restarted --
+		-- the whole terminal, not a new window of it.
+		tools.notify(
+			("%s installed in %s. Restart the terminal (not just this nvim) or the icons stay boxes."):format(
+				FONT_FILE,
+				fonts.user_font_dir()
+			)
+		)
 	end
 	M.write_iterm2_profile()
 	require("tools.windows_terminal").ensure()

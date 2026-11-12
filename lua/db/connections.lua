@@ -19,6 +19,7 @@ local DRIVERS = {
 	sqlite = true,
 	duckdb = true,
 	mongodb = true,
+	trino = true,
 }
 
 -- Driver spellings people reasonably write, mapped to the canonical one.
@@ -30,6 +31,7 @@ local DRIVER_ALIASES = {
 	tsql = "mssql",
 	sqlite3 = "sqlite",
 	mongo = "mongodb",
+	presto = "trino",
 }
 
 local cache = nil
@@ -46,9 +48,28 @@ local function warn_once(key, message)
 	end
 end
 
+--- The nearest folder, from here upwards, that holds a connection file.
+local function declared_root(cwd)
+	if vim.fn.filereadable(cwd .. "/.nvim/databases.json") == 1 then
+		return cwd
+	end
+	for dir in vim.fs.parents(cwd) do
+		if vim.fn.filereadable(dir .. "/.nvim/databases.json") == 1 then
+			return dir
+		end
+	end
+	return nil
+end
+
 function M.project_root()
-	local cwd = vim.fn.getcwd()
-	return vim.fs.root(cwd, ".git") or cwd
+	local cwd = vim.fs.normalize(vim.fn.getcwd())
+	-- A connection file outranks a .git, and is looked for above it: someone
+	-- put it there on purpose. A workspace holding several repositories side
+	-- by side -- with no repository above them -- can then declare its
+	-- databases once, at the top; with the git root alone, opening nvim inside
+	-- one of those repositories would look for the file in that repository and
+	-- find nothing.
+	return declared_root(cwd) or vim.fs.root(cwd, ".git") or cwd
 end
 
 function M.global_file()
@@ -212,7 +233,10 @@ local function check_ignored(path)
 		{ "git", "check-ignore", "-q", path },
 		{ cwd = M.project_root() },
 		vim.schedule_wrap(function(result)
-			if result.code ~= 0 then
+			-- 0 is ignored, 1 is not, anything else means git could not answer
+			-- -- usually because this folder is not a repository at all, and
+			-- then there is nothing to commit the file to.
+			if result.code == 1 then
 				warn_once("gitignore", ".nvim/databases.json is not gitignored; add '.nvim/' to .gitignore")
 			end
 		end)

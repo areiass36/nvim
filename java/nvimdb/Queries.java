@@ -77,10 +77,19 @@ public final class Queries {
 
         List<String> names = new ArrayList<>();
         List<String> types = new ArrayList<>();
+        // Where each column came from, which is what lets a cell be followed
+        // back to the row it belongs to: a foreign key in a result is only
+        // useful if the editor knows which table the value is a key into. A
+        // document result has no tables, so these stay empty for one.
+        List<String> tables = new ArrayList<>();
+        List<String> schemas = new ArrayList<>();
         if (documents == null) {
             for (int i = 1; i <= columnCount; i++) {
+                final int column = i;
                 names.add(meta.getColumnLabel(i));
                 types.add(Values.typeName(meta, i));
+                tables.add(optional(() -> meta.getTableName(column)));
+                schemas.add(optional(() -> meta.getSchemaName(column)));
             }
         }
 
@@ -120,6 +129,14 @@ public final class Queries {
             Json.writeString(out, names.get(i));
             out.append(",\"type\":");
             Json.writeString(out, types.get(i));
+            if (i < tables.size() && tables.get(i) != null) {
+                out.append(",\"table\":");
+                Json.writeString(out, tables.get(i));
+            }
+            if (i < schemas.size() && schemas.get(i) != null) {
+                out.append(",\"schema\":");
+                Json.writeString(out, schemas.get(i));
+            }
             out.append('}');
         }
         out.append("],\"rows\":[");
@@ -191,6 +208,32 @@ public final class Queries {
     @FunctionalInterface
     private interface SqlAction {
         void run() throws SQLException;
+    }
+
+    /**
+     * Read something JDBC describes as optional, and treat it as optional.
+     *
+     * getTableName and getSchemaName are the cases this exists for: DuckDB
+     * answers both with an empty string, SQLite names the table but has no
+     * schema layer to name, an expression has no table to come from on any
+     * engine, and some drivers throw rather than say so. A result the user
+     * asked for still has to come back.
+     *
+     * @return null for a value that is absent, empty or unreadable, so the
+     *         caller leaves the field out instead of writing an empty name.
+     */
+    private static String optional(SqlText source) {
+        try {
+            String value = source.get();
+            return value == null || value.isEmpty() ? null : value;
+        } catch (SQLException | RuntimeException unsupported) {
+            return null;
+        }
+    }
+
+    @FunctionalInterface
+    private interface SqlText {
+        String get() throws SQLException;
     }
 
     private static boolean isShapeless(SQLException e) {

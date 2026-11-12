@@ -1,0 +1,78 @@
+// A whole workspace in the shape the runner expects. The comments are part of
+// the case: the reader has to drop them before decoding.
+{
+  "version": 1,
+  "workspace": "demo",
+  "default": { "cluster": "local" },
+
+  "link": [{ "name": "e2e", "path": "../probe" }],
+
+  "project": [
+    {
+      "name": "api",
+      "path": "apps/api",
+      "runner": [
+        {
+          "label": "main",
+          "cwd": "${projectRoot}",
+          "command": ["npm", "run", "dev"],
+          "env": { "PORT": "3000" },
+          "ready": { "port": 3000, "timeout": 120000 },
+          "debug": { "adapter": "pwa-node", "autoAttachChildProcesses": true },
+          "singleton": true
+        },
+        {
+          "label": "migrate",
+          "command": ["npm", "run", "migrate"],
+          "oneShot": true
+        }
+      ]
+    },
+    {
+      "name": "web",
+      "path": "apps/web",
+      "runner": [
+        {
+          "label": "http",
+          "command": ["npm", "run", "dev"],
+          "env": { "HTTP_ONLY": "1", "VITE_PORT": "5173" },
+          "ready": { "http": "http://localhost:5173", "status": 200 },
+          "depends": [{ "project": "api", "runner": "main" }],
+          "singleton": true
+        },
+        {
+          "label": "chrome",
+          "debug": {
+            "adapter": "pwa-chrome",
+            "request": "launch",
+            "url": "http://localhost:5173",
+            "webRoot": "${projectRoot}"
+          },
+          "depends": [{ "runner": "http" }]
+        }
+      ]
+    }
+  ],
+
+  "cluster": [
+    {
+      "name": "local",
+      "member": [
+        { "project": "api", "runner": "main" },
+        { "project": "web", "runner": "http" }
+      ]
+    },
+    {
+      "name": "probe",
+      "member": [
+        { "cluster": "local" },
+        {
+          "workspace": "e2e",
+          "project": "playwright",
+          "runner": "audit",
+          "after": [{ "cluster": "local" }]
+        }
+      ]
+    }
+  ]
+}

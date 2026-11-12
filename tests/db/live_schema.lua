@@ -13,7 +13,11 @@ local targets = {
 	{ driver = "mongodb", schema_name = nil, table_name = "orders" },
 }
 
-schema.invalidate()
+-- Only the connections this suite uses: invalidate(nil) would also delete the
+-- catalogs the developer has swept, which cost a sweep to get back.
+for _, connection in pairs(connections) do
+	schema.invalidate(connection)
+end
 
 for _, target in ipairs(targets) do
 	local connection = connections[target.driver]

@@ -15,6 +15,8 @@ local PARSERS = {
 	"csv",
 	"c_sharp",
 	"python",
+	"java",
+	"powershell",
 	"elixir",
 	"heex",
 }

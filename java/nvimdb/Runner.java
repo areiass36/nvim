@@ -13,6 +13,7 @@ import java.util.Base64;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -32,7 +33,9 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * Requests are read on the main thread and run on a single worker, so a
  * cancel can be read while a query is still running, and two statements never
- * touch the connection at once.
+ * touch the connection at once. A catalog sweep is the exception: it takes
+ * minutes on a warehouse, so it runs on a thread of its own and on connections
+ * of its own, and the user's queries keep the worker and the connection.
  */
 public final class Runner {
     private final Connection connection;
@@ -42,7 +45,21 @@ public final class Runner {
         thread.setDaemon(true);
         return thread;
     });
+    /**
+     * A catalog sweep runs here and not on the worker, because the worker is
+     * the user's queries: a sweep of a warehouse takes minutes, and either it
+     * waits behind a query or the next query waits behind it.
+     */
+    private final ExecutorService introspector = Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(task, "nvim-db-introspect");
+        thread.setDaemon(true);
+        return thread;
+    });
+    /** One sweep at a time: a second would double the connections it opens. */
+    private final AtomicBoolean introspecting = new AtomicBoolean();
     private final AtomicReference<java.sql.Statement> running = new AtomicReference<>();
+    /** A sweep has no statement to cancel, so a cancel has to reach it as a flag. */
+    private final AtomicBoolean cancelled = new AtomicBoolean();
     private final Queries queries;
     private final Catalog catalog;
 
@@ -88,14 +105,19 @@ public final class Runner {
             return;
         }
 
-        new Runner(connection, out).loop(input);
+        new Runner(connection, out, url, properties).loop(input);
     }
 
-    private Runner(Connection connection, PrintWriter out) {
+    private Runner(Connection connection, PrintWriter out, String url, Properties properties) {
         this.connection = connection;
         this.out = out;
         this.queries = new Queries(connection, running);
-        this.catalog = new Catalog(connection);
+        // The url and the properties go with it so a catalog sweep can open
+        // connections of its own rather than take this one. The statement
+        // reference goes with it too, because the native DDL operation runs a
+        // statement on this connection and a cancel has to reach that one as
+        // well as a query's.
+        this.catalog = new Catalog(connection, cancelled, running, url, properties);
         announceReady();
     }
 
@@ -138,17 +160,21 @@ public final class Runner {
 
             if (op.equals("cancel")) {
                 // Handled here rather than on the worker, which is busy.
+                // The flag reaches a catalog sweep, which has no statement to
+                // cancel; the reported boolean stays about the statement, so
+                // a cancel aimed at a sweep is answered by the sweep itself.
+                cancelled.set(true);
                 java.sql.Statement statement = running.get();
-                boolean cancelled = false;
+                boolean stopped = false;
                 if (statement != null) {
                     try {
                         statement.cancel();
-                        cancelled = true;
+                        stopped = true;
                     } catch (SQLException ignored) {
                         // Some drivers refuse; killing the process is the fallback.
                     }
                 }
-                send("{\"id\":" + id + ",\"ok\":true,\"cancelled\":" + cancelled + "}");
+                send("{\"id\":" + id + ",\"ok\":true,\"cancelled\":" + stopped + "}");
                 continue;
             }
 
@@ -157,25 +183,53 @@ public final class Runner {
                 continue;
             }
 
+            if (op.equals("introspect")) {
+                final String[] request = fields;
+                if (!introspecting.compareAndSet(false, true)) {
+                    StringBuilder busy = new StringBuilder();
+                    Errors.write(busy, id, "a catalog sweep is already running on this connection");
+                    send(busy.toString());
+                    continue;
+                }
+                introspector.submit(() -> {
+                    try {
+                        handle(id, op, request);
+                    } finally {
+                        introspecting.set(false);
+                    }
+                });
+                continue;
+            }
+
             final String[] arguments = fields;
             worker.submit(() -> handle(id, op, arguments));
         }
 
+        // A sweep that is still running has nowhere to deliver its answer, and
+        // telling it so is what makes it delete the half-written snapshot
+        // instead of leaving it where the editor reads a finished one.
+        cancelled.set(true);
+
         // Let the work already submitted finish: a close arriving while a
         // query is in flight should still return that query's answer.
-        worker.shutdown();
-        try {
-            if (!worker.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS)) {
-                worker.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            worker.shutdownNow();
-        }
+        drain(worker);
+        drain(introspector);
         try {
             connection.close();
         } catch (SQLException ignored) {
             // Shutting down anyway.
+        }
+    }
+
+    private static void drain(ExecutorService service) {
+        service.shutdown();
+        try {
+            if (!service.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS)) {
+                service.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            service.shutdownNow();
         }
     }
 
@@ -200,7 +254,21 @@ public final class Runner {
                         response, id, decode(field(fields, 2)), decode(field(fields, 3)), decode(field(fields, 4)));
                 case "columns" -> catalog.columns(
                         response, id, decode(field(fields, 2)), decode(field(fields, 3)), decode(field(fields, 4)));
+                case "snapshot" -> catalog.snapshot(
+                        response, id, decode(field(fields, 2)), decode(field(fields, 3)));
+                case "introspect" -> catalog.introspect(
+                        response,
+                        id,
+                        decode(field(fields, 2)),
+                        decode(field(fields, 3)),
+                        Integer.parseInt(orZero(field(fields, 4))),
+                        Long.parseLong(orZero(field(fields, 5))),
+                        field(fields, 6).equals("1"));
+                case "details" -> catalog.details(
+                        response, id, decode(field(fields, 2)), decode(field(fields, 3)), decode(field(fields, 4)));
                 case "ddl" -> catalog.ddl(
+                        response, id, decode(field(fields, 2)), decode(field(fields, 3)), decode(field(fields, 4)));
+                case "native_ddl" -> catalog.nativeDdl(
                         response, id, decode(field(fields, 2)), decode(field(fields, 3)), decode(field(fields, 4)));
                 default -> Errors.write(response, id, "unknown operation: " + op);
             }

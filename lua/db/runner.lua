@@ -38,14 +38,26 @@ local function translate(handle, response)
 		return finish(handle, nil, errors.from_response(response, { password = request.password }))
 	end
 
-	local columns, types = {}, {}
+	local columns, types, tables, schemas = {}, {}, {}, {}
 	for index, column in ipairs(response.columns or {}) do
 		columns[index] = column.name
 		types[index] = column.type
+		-- Where the column came from, when the driver will say. A column
+		-- computed by an expression, or one coming out of a join of
+		-- subqueries, has no table behind it: the field is then absent and
+		-- stays absent here, so a caller only has to test for nil.
+		tables[index] = column.table
+		schemas[index] = column.schema
 	end
 
+	-- An export answers with the number of rows it wrote, under the same name
+	-- a query uses for the rows themselves. Walking a number would raise, so
+	-- the two have to be told apart before either is read.
+	local written = type(response.rows) == "number" and response.rows or nil
+	local source_rows = type(response.rows) == "table" and response.rows or {}
+
 	local rows = {}
-	for _, source in ipairs(response.rows or {}) do
+	for _, source in ipairs(source_rows) do
 		local row = {}
 		for index = 1, #columns do
 			local value = source[index]
@@ -59,10 +71,13 @@ local function translate(handle, response)
 	finish(handle, {
 		columns = columns,
 		column_types = types,
+		column_tables = tables,
+		column_schemas = schemas,
 		rows = rows,
 		has_more = response.hasMore == true,
 		elapsed_ms = response.elapsedMs,
 		update_count = response.updateCount,
+		rows_written = written,
 		connection = request.connection,
 		sql = request.sql,
 		limit = request.limit,
@@ -162,7 +177,7 @@ function M.run(request, callback)
 	local connection = request.connection
 	request.timeout_ms = request.timeout_ms or connection.timeout_ms or config.get().timeout_ms
 
-	if jvm.is_connected(connection.id) then
+	if jvm.is_connected_to(connection) then
 		enqueue(handle)
 		return handle
 	end

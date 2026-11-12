@@ -6,10 +6,12 @@
 --
 --   connections  the three config levels (global, project, per file)
 --   secrets      passwords, from the OS keyring or the environment
---   clients      usql / duckdb / mongosh, downloaded on first use
---   runner       one process per statement, queued per connection
+--   jvm          one Java process per connection, kept alive
+--   runner       statements queued per connection, cancelled on the server
 --   grid         the result buffer
 --   explorer     the Telescope schema picker
+--   document     db:// buffers: a table's definition, a schema's contents
+--   lsp          go to definition, hover and symbols, from the swept catalog
 --   diagnostics  validates a statement on the server without running it
 local M = {}
 
@@ -39,6 +41,11 @@ function M.setup()
 	require("db.runner").setup()
 	require("db.grid.duckdb_view").setup()
 	require("db.dialect").setup()
+	-- Before buffer, which attaches to the sql buffers already open: the
+	-- language server starts from there, and db:// documents have to be
+	-- readable before anything can jump to one.
+	require("db.document").setup()
+	require("db.lsp").setup()
 	require("db.buffer").setup()
 	require("db.diagnostics").setup()
 	require("db.completion").setup()

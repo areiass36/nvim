@@ -1,6 +1,7 @@
--- How debugging looks: a separate "debug tab" with the dap-ui panels, full
--- screen floats for quick looks, session notifications and a real terminal
--- for adapters that cannot provide one.
+-- How debugging looks: a separate "debug tab" with the dap-ui panels, focused
+-- floats for quick looks -- the program output full screen, like the terminal of
+-- this config -- session notifications and a real terminal for adapters that
+-- cannot provide one.
 local dap = require("dap")
 local dapui = require("dapui")
 local icons = require("core.icons")
@@ -34,23 +35,100 @@ local function is_floating(win)
 end
 
 -- ---------------------------------------------------------------- floats
-local function full_screen_opts()
-	return { enter = true, width = vim.o.columns - 4, height = vim.o.lines - 6 }
-end
+-- Two shapes, both taken from the rest of this config: program output opens like
+-- the terminal (lua/plugins/editor/toggleterm.lua) -- the whole screen, no
+-- border -- and the inspection panels open like the database document float, a
+-- wide rounded one. Both are entered on open and close with q or Esc.
+--
+-- dapui.float_element is not used for them: it anchors the window at the cursor,
+-- shrinks it to the content and registers "au WinEnter,CursorMoved * ++once
+-- close_float", so a panel that does not hold the focus dies on the next cursor
+-- move; and its single open_float slot swallows the next call when a float was
+-- closed behind its back.
 
---- Show a buffer in a full screen float. Esc closes it, even from terminal mode.
-function M.float_buffer(buf, title)
-	vim.api.nvim_open_win(buf, true, {
+--- @alias debugger.Shape "terminal"|"panel"
+
+--- @param shape debugger.Shape
+local function window_config(shape, title)
+	if shape == "terminal" then
+		return {
+			relative = "editor",
+			row = 0,
+			col = 0,
+			width = vim.o.columns,
+			height = vim.o.lines - 2,
+			border = "none",
+			style = "minimal",
+		}
+	end
+	return {
 		relative = "editor",
 		row = 1,
 		col = 2,
 		width = vim.o.columns - 4,
 		height = vim.o.lines - 6,
 		border = "rounded",
-		title = " " .. title .. " ",
+		title = (" %s "):format(title or "debug"),
 		title_pos = "center",
 		style = "minimal",
+	}
+end
+
+-- win -> { buf, shape, title }: a resize keeps a full screen float full screen,
+-- and a stop takes the quick looks off the screen.
+local floats = {}
+
+local function close_floats()
+	for _, win in ipairs(vim.tbl_keys(floats)) do
+		if vim.api.nvim_win_is_valid(win) then
+			pcall(vim.api.nvim_win_close, win, true)
+		end
+		floats[win] = nil
+	end
+end
+
+--- nvim-dap opens the debuggee's terminal with no window of its own, so its pty
+--- is sized at half the screen (session.lua: height = ceil(lines / 2)). Telling
+--- the job the size of the window it is shown in keeps the program's own line
+--- breaks straight.
+local function fit_pty(win, buf)
+	local job = vim.b[buf] and vim.b[buf].terminal_job_id
+	if job then
+		pcall(vim.fn.jobresize, job, vim.api.nvim_win_get_width(win), vim.api.nvim_win_get_height(win))
+	end
+end
+
+local function resize_floats()
+	for win, float in pairs(floats) do
+		if vim.api.nvim_win_is_valid(win) then
+			pcall(vim.api.nvim_win_set_config, win, window_config(float.shape, float.title))
+			fit_pty(win, float.buf)
+		end
+	end
+end
+
+--- Open `buf` focused in a float of this shape. A buffer already on screen is
+--- jumped to instead of stacked twice: the panels share their buffer with the
+--- debug tab.
+--- @param shape debugger.Shape
+local function open_float(buf, shape, title, tail)
+	for win, float in pairs(floats) do
+		if float.buf == buf and vim.api.nvim_win_is_valid(win) then
+			vim.api.nvim_set_current_win(win)
+			return win
+		end
+	end
+
+	local win = vim.api.nvim_open_win(buf, true, window_config(shape, title))
+	floats[win] = { buf = buf, shape = shape, title = title }
+	vim.api.nvim_create_autocmd("WinClosed", {
+		pattern = tostring(win),
+		once = true,
+		callback = function()
+			floats[win] = nil
+		end,
 	})
+
 	vim.keymap.set("n", "q", "<cmd>close<CR>", { buffer = buf, nowait = true })
 	vim.keymap.set({ "n", "t" }, "<Esc>", function()
 		vim.cmd("stopinsert")
@@ -58,11 +136,36 @@ function M.float_buffer(buf, title)
 			vim.api.nvim_win_close(0, true)
 		end
 	end, { buffer = buf, nowait = true })
-	vim.cmd("normal! G")
+
+	fit_pty(win, buf)
+	if tail then
+		vim.cmd("normal! G")
+	end
+	return win
 end
 
-function M.float_element(element)
-	dapui.float_element(element, full_screen_opts())
+--- Show a buffer full screen, like the terminal of this config.
+function M.float_buffer(buf, title)
+	return open_float(buf, "terminal", title, true)
+end
+
+-- Output grows at the bottom; a variable tree is read from the top.
+local TAIL = { console = true, repl = true }
+
+--- A dap-ui element in a focused float. The buffer comes from the element
+--- itself, so the window is ours and survives a cursor move.
+function M.float_element(name)
+	local element = dapui.elements[name]
+	if not element then
+		return notify("no such element: " .. name, vim.log.levels.ERROR)
+	end
+	-- The element renders through nio, so it needs a task of its own.
+	pcall(require("nio").run, element.render)
+	local ok, buf = pcall(element.buffer)
+	if not ok or type(buf) ~= "number" or not vim.api.nvim_buf_is_valid(buf) then
+		return notify(name .. " has no buffer yet", vim.log.levels.WARN)
+	end
+	return open_float(buf, name == "console" and "terminal" or "panel", name, TAIL[name])
 end
 
 -- ------------------------------------------------------------- debug tab
@@ -72,17 +175,38 @@ local function debug_tab_is_valid()
 	return debug_tab ~= nil and vim.api.nvim_tabpage_is_valid(debug_tab)
 end
 
---- Switch between the code tab and the debug tab (created on first use).
+--- Put the cursor on a panel of the debug tab instead of leaving it on the copy
+--- of the code behind them. dapui.open() builds its windows in a nio task, so
+--- the panel is not always there on the first look.
+local function focus_panel(filetype, attempt)
+	for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+		if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == filetype then
+			vim.api.nvim_set_current_win(win)
+			return
+		end
+	end
+	attempt = (attempt or 0) + 1
+	if attempt < 6 then
+		vim.defer_fn(function()
+			focus_panel(filetype, attempt)
+		end, 40)
+	end
+end
+
+--- Switch between the code tab and the debug tab (created on first use). The
+--- cursor lands on the variables, which is what the tab is for.
 function M.toggle_debug_tab()
 	if debug_tab_is_valid() and vim.api.nvim_get_current_tabpage() == debug_tab then
-		vim.cmd("tabprevious")
-	elseif debug_tab_is_valid() then
+		return vim.cmd("tabprevious")
+	end
+	if debug_tab_is_valid() then
 		vim.api.nvim_set_current_tabpage(debug_tab)
 	else
 		vim.cmd("tab split")
 		debug_tab = vim.api.nvim_get_current_tabpage()
 		dapui.open()
 	end
+	focus_panel("dapui_scopes")
 end
 
 function M.close_debug_tab()
@@ -318,6 +442,19 @@ local function setup_escape_to_close()
 	})
 end
 
+-- A float covers the code, so the line the program just stopped on would sit
+-- behind it: a stop closes the quick looks and leaves the debug tab alone. A
+-- terminal float is meant to be the whole screen, so it follows a resize.
+local function setup_float_lifecycle()
+	dap.listeners.before.event_stopped["ui.floats"] = function()
+		close_floats()
+	end
+	vim.api.nvim_create_autocmd("VimResized", {
+		group = vim.api.nvim_create_augroup("DapFloatResize", { clear = true }),
+		callback = resize_floats,
+	})
+end
+
 function M.setup()
 	dapui.setup({
 		icons = {
@@ -353,6 +490,7 @@ function M.setup()
 	setup_output_routing()
 	setup_session_notifications()
 	setup_escape_to_close()
+	setup_float_lifecycle()
 end
 
 return M

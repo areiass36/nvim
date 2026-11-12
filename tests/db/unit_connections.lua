@@ -51,8 +51,17 @@ local connections = require("db.connections")
 local resolve = require("db.resolve")
 connections.reload()
 
+--- Only the throwaway project's connections. The global file belongs to whoever
+--- runs the tests and may hold anything, so counting everything would make
+--- this depend on the machine.
+local function project_connections()
+	return vim.tbl_filter(function(connection)
+		return connection.scope == "project"
+	end, connections.all())
+end
+
 support.describe("connections: reading the project file")
-check("three connections", #connections.all(), 3)
+check("three connections", #project_connections(), 3)
 check("driver aliases are canonical", connections.get("local-pg").driver, "postgres")
 check("sqlserver too", connections.get("warehouse").driver, "mssql")
 check(
@@ -88,7 +97,7 @@ connections.reload()
 check("the connection is dropped, not loaded with the password", connections.get("bad"), nil)
 vim.fn.writefile(original, root .. "/.nvim/databases.json")
 connections.reload()
-check("and the good file still loads", #connections.all(), 3)
+check("and the good file still loads", #project_connections(), 3)
 
 support.describe("connections: a bad driver is refused")
 vim.fn.writefile({
@@ -165,3 +174,44 @@ check("and it survives a reload", connections.get("__test_scratch__") ~= nil, tr
 local scratch_buf = vim.api.nvim_create_buf(false, true)
 resolve.bind(scratch_buf, "__test_scratch__")
 check("a buffer can resolve to it", resolve.for_buf(scratch_buf).id, "__test_scratch__")
+
+support.describe("connections: which folder is the project")
+-- A workspace holding repositories side by side, with the databases declared
+-- once above all of them.
+local workspace = vim.fn.tempname()
+vim.fn.mkdir(workspace .. "/.nvim", "p")
+vim.fn.mkdir(workspace .. "/repo", "p")
+vim.fn.system({ "git", "init", "-q", workspace .. "/repo" })
+vim.fn.writefile({
+	vim.json.encode({
+		version = 1,
+		connections = { { id = "ws-pg", name = "WS", driver = "postgres", host = "h", database = "d" } },
+	}),
+}, workspace .. "/.nvim/databases.json")
+
+vim.cmd(("cd %s"):format(vim.fn.fnameescape(workspace .. "/repo")))
+connections.reload()
+check("a connection file above a repository outranks its .git", connections.project_root(), vim.fs.normalize(workspace))
+check("so the workspace's connections load from inside it", connections.get("ws-pg") ~= nil, true)
+
+vim.fn.mkdir(workspace .. "/repo/.nvim", "p")
+vim.fn.writefile(
+	{ vim.json.encode({ version = 1, connections = {} }) },
+	workspace .. "/repo/.nvim/databases.json"
+)
+check(
+	"but a file of its own is nearer",
+	connections.project_root(),
+	vim.fs.normalize(workspace .. "/repo")
+)
+
+vim.fn.delete(workspace .. "/repo/.nvim", "rf")
+vim.fn.delete(workspace .. "/.nvim", "rf")
+check(
+	"and with no connection file anywhere, the repository is the project",
+	connections.project_root(),
+	vim.fs.normalize(workspace .. "/repo")
+)
+
+vim.cmd(("cd %s"):format(vim.fn.fnameescape(root)))
+connections.reload()

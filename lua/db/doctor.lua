@@ -14,6 +14,20 @@ local secrets = require("db.secrets")
 
 local M = {}
 
+--- A duration a person can read, for the report.
+function M.age(seconds)
+	if seconds < 90 then
+		return ("%ds"):format(seconds)
+	end
+	if seconds < 5400 then
+		return ("%dm"):format(math.floor(seconds / 60))
+	end
+	if seconds < 172800 then
+		return ("%dh"):format(math.floor(seconds / 3600))
+	end
+	return ("%dd"):format(math.floor(seconds / 86400))
+end
+
 --- @return string[]
 function M.report()
 	local lines = {}
@@ -54,6 +68,32 @@ function M.report()
 
 	local live = jvm.active()
 	row(true, "connected now", #live > 0 and table.concat(live, ", ") or "none")
+
+	-- Whether this buffer's database has been swept is the difference between
+	-- an explorer that answers from disk and one that asks the server for
+	-- every level, so it belongs in the report.
+	local current = require("db.resolve").for_buf(0)
+	if current then
+		local schema = require("db.schema")
+		local catalog = require("db.explorer").entry_point(current).context.catalog
+		local stat = schema.snapshot_stat(current, catalog)
+		if stat then
+			row(
+				true,
+				"introspected",
+				("%s: %d schemas, %d tables, %d columns, %s ago%s"):format(
+					current.name,
+					stat.schemas,
+					stat.tables,
+					stat.columns,
+					M.age(stat.age_seconds),
+					stat.partial and ", definitions incomplete" or ""
+				)
+			)
+		else
+			row(false, "introspected", ("%s: not yet -- :DbIntrospect"):format(current.name))
+		end
+	end
 
 	local list = connections.all()
 	row(#list > 0, "connections", ("%d configured"):format(#list))

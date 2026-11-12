@@ -1,0 +1,32 @@
+// Three deliberate mistakes, one per reported path: a command written as a
+// shell string, a ready with two signals, and a member pointing at a label
+// that does not exist.
+{
+  "version": 1,
+  "workspace": "broken",
+
+  "project": [
+    {
+      "name": "api",
+      "path": "apps/api",
+      "runner": [
+        { "label": "main", "command": "npm run dev" },
+        {
+          "label": "peer",
+          "command": ["npm", "run", "dev"],
+          "ready": { "port": 3001, "log": "mark api listening" }
+        }
+      ]
+    }
+  ],
+
+  "cluster": [
+    {
+      "name": "local",
+      "member": [
+        { "project": "api", "runner": "main" },
+        { "project": "api", "runner": "ghost" }
+      ]
+    }
+  ]
+}

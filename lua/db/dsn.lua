@@ -11,6 +11,7 @@ local DEFAULT_PORTS = {
 	mariadb = 3306,
 	mssql = 1433,
 	mongodb = 27017,
+	trino = 8080,
 }
 
 local function encode(value)
@@ -97,6 +98,30 @@ function M.build(connection)
 		return ("jdbc:sqlserver://%s:%d%s"):format(host, port, query_string(options, ";", ";"))
 	end
 
+	if driver == "trino" then
+		-- Trino speaks HTTP, and what follows the host is catalog[/schema],
+		-- not a database. Port 443 is TLS everywhere in practice, and without
+		-- SSL=true the driver reports a TLS server as an unexpected end of
+		-- stream rather than as the wrong scheme.
+		if options.SSL == nil and port == 443 then
+			options.SSL = "true"
+		end
+		local path = connection.database or ""
+		if path ~= "" and connection.default_schema then
+			path = path .. "/" .. connection.default_schema
+		end
+		-- An empty catalog segment is rejected by the driver, so with no
+		-- catalog the path is left off entirely. A query then names the catalog
+		-- itself (catalog.schema.table), which is how Trino SQL is usually
+		-- written anyway; walking into a catalog in the explorer fills it in.
+		return ("jdbc:trino://%s:%d%s%s"):format(
+			host,
+			port,
+			path ~= "" and ("/" .. path) or "",
+			query_string(options, "&", "?")
+		)
+	end
+
 	if driver == "mongodb" then
 		if connection.user and options.authSource == nil then
 			options.authSource = "admin"
@@ -128,6 +153,26 @@ function M.redact(text, password)
 	redacted = redacted:gsub("(%w+://[^:/@%s]+):[^@%s]*@", "%1:***@")
 	redacted = redacted:gsub("([Pp]assword=)[^;%s&]*", "%1***")
 	return redacted
+end
+
+--- The options that have to reach the driver as JDBC properties.
+---
+--- build() writes them into the url for every driver but the two whose url is
+--- a bare file path, and passing them a second time as properties is not
+--- harmless: the Trino driver refuses a property it sees in both places
+--- ("Connection property SSLVerification is passed both by URL and
+--- properties") rather than picking one. So the url owns them wherever it can
+--- carry them, and this is what is left over.
+local FILE_URL_DRIVERS = {
+	sqlite = true,
+	duckdb = true,
+}
+
+function M.properties(connection)
+	if FILE_URL_DRIVERS[connection.driver] then
+		return connection.options or {}
+	end
+	return {}
 end
 
 function M.default_port(driver)

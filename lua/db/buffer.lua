@@ -57,6 +57,9 @@ function M.attach(bufnr)
 	local connection = resolve.for_buf(bufnr)
 	if connection then
 		require("db.dialect").attach(bufnr, connection.driver)
+		-- gd, gr, K and gO come from a language server that answers out of the
+		-- catalog of this buffer's database (db/lsp.lua).
+		require("db.lsp").start(bufnr)
 	end
 end
 

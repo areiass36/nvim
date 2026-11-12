@@ -12,8 +12,16 @@ for (const { name, codepoint, icon } of map) {
   const raw = fs.readFileSync(path.join(svgDir, `${icon}.svg`), "utf8");
   const vb = raw.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number); const [vx, vy, vw, vh] = vb;
   const inner = raw.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "").replace(/<!--[\s\S]*?-->/g, "");
-  const size = 540, scale = size / Math.max(vw, vh);
-  const tx = 30 + (size - vw * scale) / 2 - vx * scale, ty = 210 + (size - vh * scale) / 2 - vy * scale;
+  // Fit the glyph to a box rather than to a single number: scaling by the
+  // larger side alone left a tall icon (448x512) far smaller than the cell it
+  // had to be told apart in. Width is capped just under JetBrains Mono's 600
+  // advance so a wide icon cannot bleed into the next cell, height at 700 so a
+  // tall one uses the ascent it has.
+  const maxW = 576, maxH = 700;
+  const scale = Math.min(maxW / vw, maxH / vh);
+  const w = vw * scale, h = vh * scale;
+  // Centred on the advance, and still seated on the baseline at y=750.
+  const tx = (600 - w) / 2 - vx * scale, ty = 750 - h - vy * scale;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 1000" width="600" height="1000"><g transform="translate(${tx} ${ty}) scale(${scale})">${inner}</g></svg>`;
   const s = Readable.from([svg]); s.metadata = { unicode: [String.fromCodePoint(codepoint)], name }; font.write(s);
 }

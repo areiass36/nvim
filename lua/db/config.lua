@@ -14,11 +14,41 @@ M.defaults = {
 	-- Rows scanned when measuring column widths.
 	width_sample = 1000,
 	null_text = "NULL",
+	-- Tint every other row of the result, in whatever colour the colourscheme
+	-- uses for the cursor line. It is what keeps the eye on one row across a
+	-- wide table; off, the grid is drawn on the plain background.
+	stripe_rows = true,
 	-- Results materialised as CSV are kept this many days, for the case where
 	-- nvim was killed before it could clean up after itself.
 	result_retention_days = 2,
 	-- Catalog queries are cached per connection for this long.
 	schema_ttl_seconds = 3600,
+	-- :DbIntrospect sweeps the whole connected database and keeps it under
+	-- stdpath("state")/db/catalog, where it answers for every level of the
+	-- explorer and every table preview until it is asked for again. The sweep
+	-- runs on connections of its own so the editor is never queued behind it;
+	-- this is how many of them at most. One keeps it on the single connection
+	-- the process already has, which is what a file-backed driver gets anyway.
+	introspect_parallelism = 4,
+	introspect_timeout_ms = 600000,
+	-- Collect each table's indexes and foreign keys as well, which is what
+	-- lets a table's definition be previewed without asking the server. Off,
+	-- the sweep is a good deal cheaper and a definition costs one round trip.
+	introspect_details = true,
+	-- Sweep once, in the background, the first time the explorer is opened on
+	-- a database that has never been swept. Nothing waits for it.
+	introspect_on_first_use = true,
+	-- Resting on a schema in the explorer fills its cache in the background, so
+	-- walking into it is instant. One round trip per schema, debounced, and it
+	-- shares the one worker thread the connection has: warming a catalog
+	-- outright is deliberately not done, because on an engine like Trino a
+	-- catalog holds hundreds of schemas and the queue is also your own query's.
+	schema_warm = true,
+	schema_warm_debounce_ms = 250,
+	-- Show a few rows beside a table in the explorer's preview. Off: the
+	-- preview is metadata only, which costs nothing once the schema is cached,
+	-- where a sample is a real query against every table the cursor lands on.
+	preview_sample = false,
 	-- Validate the statement under the cursor on save. The server parses it
 	-- and never runs it, so this is safe for every kind of statement.
 	validate_on_save = true,

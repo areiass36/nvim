@@ -4,7 +4,6 @@
 -- character occupies two cells, a combining mark none, and counting bytes would
 -- bend every separator out of line.
 local config = require("db.config")
-local db = require("db")
 local value_module = require("db.value")
 
 local M = {}
@@ -118,7 +117,7 @@ end
 ---
 --- @return string[] lines
 --- @return table spans spans[line][column] = { start_byte, end_byte } 0-based, end exclusive
---- @return table nulls list of { line, column } for highlighting
+--- @return table kinds kinds[line][column] = what the cell holds, for colouring
 function M.render(layout, columns, rows, opts)
 	opts = opts or {}
 	local settings = config.get()
@@ -126,7 +125,7 @@ function M.render(layout, columns, rows, opts)
 	local widths = layout.widths
 	local SEPARATOR = " │ "
 
-	local lines, spans, nulls = {}, {}, {}
+	local lines, spans, kinds = {}, {}, {}
 
 	local function compose(parts, line_index)
 		local line_spans = {}
@@ -148,19 +147,19 @@ function M.render(layout, columns, rows, opts)
 	lines[2] = "─" .. table.concat(separator_parts, "─┼─") .. "─"
 
 	for row_index, row in ipairs(rows) do
-		local parts = {}
+		local parts, row_kinds = {}, {}
 		for index = 1, #columns do
 			local raw = row[index]
 			local text = M.sanitize(raw, null_text)
 			parts[index] = pad(M.truncate(text, widths[index]), widths[index])
-			if raw == db.NULL then
-				nulls[#nulls + 1] = { row_index + 2, index }
-			end
+			-- Bytes that were never text beat any shape they happen to match.
+			row_kinds[index] = M.looks_binary(raw) and "binary" or value_module.kind(raw)
 		end
+		kinds[row_index + 2] = row_kinds
 		lines[row_index + 2] = compose(parts, row_index + 2)
 	end
 
-	return lines, spans, nulls
+	return lines, spans, kinds
 end
 
 return M

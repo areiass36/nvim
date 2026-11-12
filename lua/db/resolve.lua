@@ -147,6 +147,10 @@ function M.bind(bufnr, id)
 	last_used = id
 	vim.b[bufnr].db_connection_resolved = id
 	save()
+	-- The language server answers from the chosen database's catalog, so the
+	-- choice starts it rather than the next FileType: this is also the path
+	-- M.pick and the explorer take.
+	require("db.lsp").start(bufnr)
 end
 
 function M.unbind(bufnr)
@@ -170,7 +174,7 @@ function M.pick(bufnr, on_done)
 	bufnr = bufnr or vim.api.nvim_get_current_buf()
 	local list = connections.all()
 	if #list == 0 then
-		db.notify("no connections configured; run :DbInit or :DbAdd", vim.log.levels.WARN)
+		db.notify("no connections configured; run :DbInit", vim.log.levels.WARN)
 		return
 	end
 	vim.ui.select(list, {

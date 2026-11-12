@@ -85,3 +85,39 @@ support.describe("sql/classify: wrappable is only used for the write guards now"
 -- spliced into the statement and no dialect needs a LIMIT spelled out.
 check("a select is still recognised", classify.kind("select * from t"), "select")
 check("and a write still is", classify.kind("delete from t where id = 1"), "dml")
+
+support.describe("sql/split: a backslash is only an escape in mysql")
+
+-- A long bracket so the backslash below is one literal character, with no
+-- escaping to reason about in the test itself.
+local BS = [[\]]
+
+check(
+	"trino: a string ending in a backslash does not swallow the terminator",
+	texts("select split_part(path, '" .. BS .. "', 1);\nselect 2;", "trino"),
+	{ "select split_part(path, '" .. BS .. "', 1)", "select 2" }
+)
+
+check(
+	"postgres reads it the same way",
+	texts("select '" .. BS .. "' as sep;\nselect 2;", "postgres"),
+	{ "select '" .. BS .. "' as sep", "select 2" }
+)
+
+check(
+	"mysql keeps the escape, so that quote does not close the string",
+	texts("select '" .. BS .. "' , 1;\nselect 2;", "mysql"),
+	{ "select '" .. BS .. "' , 1;\nselect 2;" }
+)
+
+check(
+	"no dialect at all is the standard reading, not mysql's",
+	texts("select '" .. BS .. "';\nselect 2;"),
+	{ "select '" .. BS .. "'", "select 2" }
+)
+
+check(
+	"a doubled quote is still the escape everywhere",
+	texts("select 'it''s; fine';\nselect 2;", "trino"),
+	{ "select 'it''s; fine'", "select 2" }
+)

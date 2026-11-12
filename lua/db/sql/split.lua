@@ -6,9 +6,21 @@
 -- ones a lexer can track -- dollar-quoted bodies in Postgres, MySQL's DELIMITER,
 -- SQL Server's GO batch separator, and nested block comments.
 --
--- Visual mode bypasses all of it and sends the selection verbatim, which is the
--- escape hatch for anything this gets wrong.
+-- Visual mode bypasses all of it and sends the selection as written, bar a
+-- trailing terminator, which is the escape hatch for anything this gets wrong.
 local M = {}
+
+-- MySQL is the only one of these engines that treats a backslash inside a
+-- string as an escape. In Trino, Postgres, SQLite and SQL Server it is an
+-- ordinary character and a doubled quote is the only escape, so consuming
+-- whatever follows a backslash swallows the closing quote: a literal path or
+-- separator ending in one would leave the lexer inside a string, carry it past
+-- the terminator, and hand the whole tail of the file to the driver as one
+-- statement.
+local BACKSLASH_ESCAPES = {
+	mysql = true,
+	mariadb = true,
+}
 
 --- @class db.Statement
 --- @field text string
@@ -42,6 +54,7 @@ function M.statements(text, dialect)
 	end
 
 	local statements = {}
+	local backslash_escapes = BACKSLASH_ESCAPES[dialect] or false
 	local delimiter = ";"
 	local index, length = 1, #text
 	local statement_start = 1
@@ -92,7 +105,7 @@ function M.statements(text, dialect)
 			index = index + 1
 			while index <= length do
 				local inner = text:sub(index, index)
-				if inner == "\\" and closing ~= "`" then
+				if inner == "\\" and backslash_escapes and closing ~= "`" then
 					index = index + 2
 				elseif inner == closing then
 					-- A doubled quote is an escaped one, not the end.
@@ -198,6 +211,11 @@ function M.selection(bufnr)
 	lines[#lines] = lines[#lines]:sub(1, math.min(to[2] + 1, #lines[#lines]))
 	lines[1] = lines[1]:sub(from[2] + 1)
 	local text = vim.trim(table.concat(lines, "\n"))
+	-- A terminator belongs to the splitter, not to the driver: Trino rejects a
+	-- statement that ends in one outright ("mismatched input ';'"), and it also
+	-- breaks the subquery the sort wraps the statement in. The rest of the
+	-- selection is still sent verbatim.
+	text = vim.trim((text:gsub(";%s*$", "")))
 	if text == "" then
 		return nil
 	end

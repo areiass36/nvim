@@ -9,6 +9,7 @@
 -- the untruncated value out of state.rows.
 local config = require("db.config")
 local db = require("db")
+local highlight = require("db.grid.highlight")
 local layout = require("db.grid.layout")
 local value_module = require("db.value")
 
@@ -18,6 +19,9 @@ local NAMESPACE = vim.api.nvim_create_namespace("db_grid")
 -- The current cell gets its own namespace so moving the cursor does not have to
 -- repaint the table's highlights.
 local CELL_NAMESPACE = vim.api.nvim_create_namespace("db_grid_cell")
+local CELL_PRIORITY = 150
+-- A query this slow is worth noticing, so the time in the footer says so.
+local SLOW_MS = 1000
 local states = {}
 
 --- @class db.GridState
@@ -25,6 +29,7 @@ local states = {}
 --- @field columns string[]
 --- @field rows any[][]
 --- @field spans table
+--- @field kinds table what each cell holds, keyed the same way as spans
 --- @field layout db.Layout
 --- @field row integer current data row, 1-based
 --- @field column integer current column, 1-based
@@ -34,6 +39,14 @@ function M.state(bufnr)
 	return states[bufnr or vim.api.nvim_get_current_buf()]
 end
 
+--- The footer, and the byte span of each part so they can be told apart: which
+--- connection answered, how many rows, how long it took.
+---
+--- An UPDATE or an INSERT has no columns and no rows, only a count of the rows
+--- it touched, and this is the only place that count can appear: a window
+--- saying "no rows" is a worse answer than the one the server gave.
+--- @return string text
+--- @return table segments list of { start_byte, end_byte, group }
 local function footer(state)
 	local result = state.result
 	local connection = result.connection or {}
@@ -42,15 +55,40 @@ local function footer(state)
 	if #state.rows == 0 then
 		range = "no rows"
 	end
+	if #state.columns == 0 and result.update_count then
+		local affected = result.update_count
+		-- JDBC answers -1 when the driver will not say how many rows a
+		-- statement touched, which is not the same as having touched none.
+		if affected < 0 then
+			range = "statement ran"
+		else
+			range = ("%d row%s affected"):format(affected, affected == 1 and "" or "s")
+		end
+	end
+	local elapsed = result.elapsed_ms or 0
 	local parts = {
-		("%s [%s]"):format(connection.name or "?", connection.driver or "?"),
-		range .. (result.has_more and " (more)" or ""),
-		("%d ms"):format(result.elapsed_ms or 0),
+		{
+			("%s [%s]"):format(connection.name or "?", connection.driver or "?"),
+			connection.production and "DbGridProduction" or "DbGridConnection",
+		},
+		{ range .. (result.has_more and " (more)" or ""), "DbGridCount" },
+		{ ("%d ms"):format(elapsed), elapsed >= SLOW_MS and "DbGridSlow" or "DbGridElapsed" },
 	}
 	if state.has_binary then
-		parts[#parts + 1] = "binary column: select encode(col,'hex') to read it"
+		parts[#parts + 1] = { "binary column: select encode(col,'hex') to read it", "DbGridBinary" }
 	end
-	return table.concat(parts, "  ·  ")
+
+	local SEPARATOR = "  ·  "
+	local texts, segments, cursor = {}, {}, 0
+	for index, part in ipairs(parts) do
+		if index > 1 then
+			cursor = cursor + #SEPARATOR
+		end
+		segments[#segments + 1] = { cursor, cursor + #part[1], part[2] }
+		cursor = cursor + #part[1]
+		texts[#texts + 1] = part[1]
+	end
+	return table.concat(texts, SEPARATOR), segments
 end
 
 local function render(bufnr)
@@ -60,14 +98,17 @@ local function render(bufnr)
 	end
 
 	local computed = layout.compute(state.columns, state.rows, {})
-	local lines, spans, nulls = layout.render(computed, state.columns, state.rows, {})
+	local lines, spans, kinds = layout.render(computed, state.columns, state.rows, {})
 	state.layout = computed
 	state.spans = spans
+	state.kinds = kinds
 
+	-- Which cells are bytes that were never text is already known, from the
+	-- same walk that decided every other cell's colour.
 	state.has_binary = false
-	for _, row in ipairs(state.rows) do
-		for _, value in ipairs(row) do
-			if layout.looks_binary(value) then
+	for _, row_kinds in pairs(kinds) do
+		for _, kind in pairs(row_kinds) do
+			if kind == "binary" then
 				state.has_binary = true
 				break
 			end
@@ -77,27 +118,30 @@ local function render(bufnr)
 		end
 	end
 
+	local footer_text, footer_segments = footer(state)
 	table.insert(lines, "")
-	table.insert(lines, footer(state))
+	table.insert(lines, footer_text)
 
 	vim.bo[bufnr].modifiable = true
 	vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
 	vim.bo[bufnr].modifiable = false
 
-	vim.api.nvim_buf_clear_namespace(bufnr, NAMESPACE, 0, -1)
-	vim.api.nvim_buf_set_extmark(bufnr, NAMESPACE, 0, 0, { end_row = 1, hl_group = "Title", hl_eol = false })
-	vim.api.nvim_buf_set_extmark(bufnr, NAMESPACE, 1, 0, { end_row = 2, hl_group = "Comment" })
-	for _, position in ipairs(nulls) do
-		local line_spans = spans[position[1]]
-		local span = line_spans and line_spans[position[2]]
-		if span then
-			vim.api.nvim_buf_set_extmark(bufnr, NAMESPACE, position[1] - 1, span[1], {
-				end_col = span[2],
-				hl_group = "Comment",
-			})
+	local sorted_column = nil
+	for index, column in ipairs(state.columns) do
+		if state.result.order_by and tostring(column) == state.result.order_by then
+			sorted_column = index
+			break
 		end
 	end
-	vim.api.nvim_buf_set_extmark(bufnr, NAMESPACE, #lines - 1, 0, { end_row = #lines, hl_group = "Comment" })
+
+	highlight.paint(bufnr, NAMESPACE, {
+		lines = lines,
+		spans = spans,
+		kinds = kinds,
+		rows = #state.rows,
+		sorted_column = sorted_column,
+		footer = { line = #lines, segments = footer_segments },
+	})
 
 	M.highlight_cell(bufnr)
 end
@@ -117,8 +161,8 @@ function M.highlight_cell(bufnr)
 	end
 	pcall(vim.api.nvim_buf_set_extmark, bufnr, CELL_NAMESPACE, line - 1, span[1], {
 		end_col = span[2],
-		hl_group = "Visual",
-		priority = 150,
+		hl_group = "DbGridCell",
+		priority = CELL_PRIORITY,
 	})
 end
 

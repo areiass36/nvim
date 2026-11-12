@@ -28,7 +28,18 @@ else
 	-- By pid, not by pattern: this must look at exactly the process we
 	-- started, and nothing else that happens to mention it.
 	local password = vim.env.NVIM_DB_TEST_PW or support.PASSWORD
-	local command_line = pid and vim.fn.system({ "ps", "-o", "command=", "-p", tostring(pid) }) or ""
+	-- Windows needs its own way of asking: ps there reports the processes Git
+	-- Bash knows about and not a native process's command line, so this read as
+	-- an empty string and the two assertions below passed without looking at
+	-- anything.
+	local function command_line_of(process)
+		if vim.fn.has("win32") == 1 then
+			local query = ('(Get-CimInstance Win32_Process -Filter "ProcessId=%d").CommandLine'):format(process)
+			return vim.fn.system({ "powershell", "-NoProfile", "-NonInteractive", "-Command", query })
+		end
+		return vim.fn.system({ "ps", "-o", "command=", "-p", tostring(process) })
+	end
+	local command_line = pid and command_line_of(pid) or ""
 	note(("argv: %s"):format(vim.trim(command_line):sub(1, 90)))
 	check("its command line holds no password", command_line:find(password, 1, true), nil)
 	check("nor the url-encoded form", command_line:find(require("db.dsn").encode(password), 1, true), nil)

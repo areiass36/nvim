@@ -46,19 +46,18 @@ end
 
 --- Register a CSV as a view. all_varchar keeps every column as text: type
 --- inference on a CSV is a guess, and a guess that turns an id into a float is
---- worse than a string. :DbTyped re-registers with inference when you want to
---- sum something.
+--- worse than a string. A query that needs a number can cast the column, which
+--- is at least written down where it happens.
 --- @param callback fun(view: string|nil, err: string|nil)
 function M.register(csv_path, opts, callback)
 	opts = opts or {}
 	counter = counter + 1
 	local view = opts.name or ("r" .. counter)
-	local typed = opts.typed and "false" or "true"
 	local sql = ([[
 CREATE OR REPLACE VIEW %s AS
-  SELECT * FROM read_csv('%s', header = true, all_varchar = %s, nullstr = '%s');
+  SELECT * FROM read_csv('%s', header = true, all_varchar = true, nullstr = '%s');
 CREATE OR REPLACE VIEW last AS SELECT * FROM %s;
-]]):format(view, csv_path, typed, export.null_marker, view)
+]]):format(view, csv_path, export.null_marker, view)
 
 	require("db.runner").run({
 		connection = M.connection(),
@@ -94,37 +93,6 @@ function M.materialise(bufnr)
 		db.notify(("%d rows available as %s (and as 'last')"):format(#state.rows, view))
 		require("db.buffer").new_query(M.connection(), ("SELECT * FROM %s LIMIT 100;"):format(view))
 	end)
-end
-
---- Views registered in this session's scratch, for the explorer and :DbViews.
-function M.views(callback)
-	require("db.runner").run({
-		connection = M.connection(),
-		sql = "SELECT view_name AS name FROM duckdb_views() WHERE NOT internal ORDER BY view_name",
-		mode = "rows",
-		limit = 0,
-		background = true,
-	}, function(result, err)
-		if err then
-			return callback({}, err.message)
-		end
-		local names = {}
-		for _, row in ipairs(result.rows or {}) do
-			names[#names + 1] = row[1]
-		end
-		callback(names, nil)
-	end)
-end
-
---- Keep a CSV out of the way of the collector.
-function M.keep(path, destination)
-	local target = destination or (vim.fn.getcwd() .. "/" .. vim.fs.basename(path))
-	local ok = vim.uv.fs_copyfile(path, target)
-	if ok then
-		db.notify(("kept as %s"):format(target))
-	else
-		db.notify(("could not copy to %s"):format(target), vim.log.levels.ERROR)
-	end
 end
 
 --- Is a process still running? uv.kill with signal 0 asks without sending

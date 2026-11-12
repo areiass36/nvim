@@ -163,5 +163,55 @@
   "name": "branch",
   "codepoint": 63008,
   "icon": "code-branch"
+ },
+ {
+  "name": "database",
+  "codepoint": 63009,
+  "icon": "database"
+ },
+ {
+  "name": "table",
+  "codepoint": 63010,
+  "icon": "table"
+ },
+ {
+  "name": "server",
+  "codepoint": 63011,
+  "icon": "server"
+ },
+ {
+  "name": "schema",
+  "codepoint": 63012,
+  "icon": "layer-group"
+ },
+ {
+  "name": "set",
+  "codepoint": 63013,
+  "icon": "table-cells-rows"
+ },
+ {
+  "name": "view",
+  "codepoint": 63014,
+  "icon": "eye"
+ },
+ {
+  "name": "collection",
+  "codepoint": 63015,
+  "icon": "brackets-curly"
+ },
+ {
+  "name": "column",
+  "codepoint": 63016,
+  "icon": "table-cells-columns"
+ },
+ {
+  "name": "key",
+  "codepoint": 63017,
+  "icon": "key"
+ },
+ {
+  "name": "up",
+  "codepoint": 63018,
+  "icon": "arrow-turn-up"
  }
 ]

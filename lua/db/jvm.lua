@@ -159,6 +159,20 @@ local function consume(process, chunk)
 	end
 end
 
+--- Ask a process to close its connection, then make sure it is gone.
+local function close(id, process)
+	processes[id] = nil
+	pcall(function()
+		process.handle:write("0\tclose\n")
+	end)
+	-- Give it a moment to close the connection cleanly, then make sure.
+	vim.defer_fn(function()
+		pcall(function()
+			process.handle:kill("sigterm")
+		end)
+	end, 500)
+end
+
 local function spawn(connection, password, on_ready)
 	local jar = jdbc.jar(connection.driver)
 	local java = jdk.java()
@@ -177,6 +191,9 @@ local function spawn(connection, password, on_ready)
 		on_ready = { on_ready },
 		buffer = "",
 		connection = connection,
+		-- The url this process is bound to: a connection that now points
+		-- somewhere else needs a new one. See M.connect.
+		url = url,
 		started_at = vim.uv.now(),
 	}
 
@@ -194,7 +211,9 @@ local function spawn(connection, password, on_ready)
 		url,
 		connection.user or "",
 	}
-	for key, value in pairs(connection.options or {}) do
+	-- Only what the url could not carry: an option sent in both places is an
+	-- error to the Trino driver, not a duplicate it resolves. See dsn.properties.
+	for key, value in pairs(require("db.dsn").properties(connection)) do
 		table.insert(command, ("%s=%s"):format(key, value))
 	end
 
@@ -216,7 +235,11 @@ local function spawn(connection, password, on_ready)
 		end,
 	}, function(result)
 		vim.schedule(function()
-			processes[connection.id] = nil
+			-- Only if it is still the current one: a replaced process exits
+			-- after its successor has registered itself under the same id.
+			if processes[connection.id] == process then
+				processes[connection.id] = nil
+			end
 			local message = process.fatal
 				or ("the database process for %s stopped (exit %d)"):format(
 					connection.name,
@@ -241,11 +264,20 @@ end
 function M.connect(connection, password, on_ready)
 	local process = processes[connection.id]
 	if process then
-		if process.ready then
-			return on_ready(true, nil)
+		-- A process is bound to the url it was started with, and a server
+		-- cannot be asked to switch database. The explorer hands out the same
+		-- connection pointed at another database or Trino catalog when you
+		-- walk into one, so that process has to be replaced -- otherwise every
+		-- question about the new one is answered about the old one.
+		local url = require("db.dsn").build(connection)
+		if not url or not process.url or url == process.url then
+			if process.ready then
+				return on_ready(true, nil)
+			end
+			table.insert(process.on_ready, on_ready)
+			return
 		end
-		table.insert(process.on_ready, on_ready)
-		return
+		close(connection.id, process)
 	end
 	spawn(connection, password, on_ready)
 end
@@ -282,6 +314,18 @@ function M.is_connected(connection_id)
 	return process ~= nil and process.ready == true
 end
 
+--- Is there a live process for this connection, pointed where it points now?
+--- A caller about to skip M.connect has to ask this one: the id alone would
+--- also match a process bound to the database or catalog it pointed at before.
+function M.is_connected_to(connection)
+	local process = processes[connection.id]
+	if not process or process.ready ~= true then
+		return false
+	end
+	local url = require("db.dsn").build(connection)
+	return url == nil or process.url == nil or url == process.url
+end
+
 function M.info(connection_id)
 	local process = processes[connection_id]
 	if not process then
@@ -297,19 +341,6 @@ end
 
 --- Stop the process for a connection, or all of them.
 function M.stop(connection_id)
-	local function close(id, process)
-		processes[id] = nil
-		pcall(function()
-			process.handle:write("0\tclose\n")
-		end)
-		-- Give it a moment to close the connection cleanly, then make sure.
-		vim.defer_fn(function()
-			pcall(function()
-				process.handle:kill("sigterm")
-			end)
-		end, 500)
-	end
-
 	if connection_id then
 		local process = processes[connection_id]
 		if process then

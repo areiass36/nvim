@@ -111,14 +111,24 @@ function M.run(opts)
 		local settings = config.get()
 		local limit = opts.limit or connection.limit or settings.limit
 		local offset = opts.offset or 0
-		local sql = statement.text
+		-- No driver wants the terminator, and Trino refuses a statement that
+		-- carries one. A statement from the splitter never has it; one typed at
+		-- :DbRun can.
+		local sql = vim.trim((statement.text:gsub(";%s*$", "")))
+		-- The statement as the user wrote it, kept aside before anything is
+		-- wrapped around it below. `rerun` sends this back through here with
+		-- the sort it is re-applying, so it has to be the unwrapped text: a
+		-- statement that arrived already wrapped would be wrapped again on
+		-- every page step and every change of sort, each layer reusing the
+		-- same alias.
+		local base_sql = sql
 
 		if opts.order_by then
 			-- Sorting is the server's job so it covers every page, not just
 			-- the rows already fetched.
 			local quoted = require("db.schema").quote(connection.driver, opts.order_by)
 			sql = ("SELECT * FROM (%s) AS _nvim_s ORDER BY %s %s"):format(
-				sql:gsub(";%s*$", ""),
+				sql,
 				quoted,
 				opts.descending and "DESC" or "ASC"
 			)
@@ -145,7 +155,7 @@ function M.run(opts)
 				return
 			end
 			diagnostics.clear(bufnr)
-			result.base_sql = sql
+			result.base_sql = base_sql
 			result.order_by = opts.order_by
 			result.descending = opts.descending
 			grid.show(result, { origin_buf = bufnr, statement = statement, focus = opts.focus })

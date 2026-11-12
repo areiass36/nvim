@@ -2,13 +2,28 @@
 -- Suggestions arrive two ways: grey ghost text inline, and as a source in the
 -- nvim-cmp popup next to the LSP items (see lsp/completion.lua).
 --
--- The key is read from $ANTHROPIC_API_KEY at request time; only the variable
--- name lives here, never the secret.
+-- The key is read from kvstore at request time (see lua/ai/keys.lua); neither
+-- the secret nor an environment variable name is what matters here anymore.
+--
+-- The request carries project context the way Copilot does -- a summary of
+-- every file's declarations plus the buffers you last visited, assembled in
+-- lua/ai/context.lua. That digest is large and does not change while you type,
+-- so it goes in the system prompt and the transform below marks it as a
+-- cacheable prefix: written once, then read back at about a tenth of the input
+-- price on every later keystroke pause.
 return {
 	"milanglacier/minuet-ai.nvim",
-	dependencies = { "hrsh7th/nvim-cmp" },
+	dependencies = { "hrsh7th/nvim-cmp", "areiass36/kvstore.nvim" },
 	event = "InsertEnter",
+	-- At startup, so :AiContext and the index refresh exist without waiting for
+	-- the first insert. Neither module pulls in minuet.
+	init = function()
+		require("ai.context").setup()
+		require("ai.keys").setup()
+	end,
 	config = function()
+		local defaults = require("minuet.config")
+
 		require("minuet").setup({
 			provider = "claude",
 
@@ -18,34 +33,77 @@ return {
 			-- One candidate. Each extra one is another generation to wait for;
 			-- raise it and the virtualtext shows "(1/2)" to cycle with <A-]>.
 			n_completions = 1,
-			context_window = 12000,
+			-- The current file is the only part of the prompt that cannot be
+			-- cached -- it changes with every keystroke -- so it is also where
+			-- the whole per-request bill is. Raised from 12000 because nine
+			-- files here are longer than that and were being truncated, but no
+			-- further: beyond the three largest files the project index below
+			-- already covers what falls outside this window.
+			context_window = 16000,
 			debounce = 400,
 			throttle = 1000,
-			request_timeout = 3,
+			-- One second more than before: the prompt now carries the project
+			-- digest, and a cold request -- the first of a session, or the first
+			-- after the index is rebuilt -- has to prefill it uncached.
+			request_timeout = 4,
 			-- Only surface real failures (a missing key, a 401); "no completion
 			-- this time" is not worth a message on every pause.
 			notify = "error",
 
 			provider_options = {
 				claude = {
-					-- Sonnet 5.5 is the best model that can shed up-front thinking,
-					-- which is what time-to-first-token costs here. Haiku 5.5 is
-					-- faster and far cheaper; to use it, swap the model line and
-					-- change the thinking type to "disabled" (Sonnet rejects that one,
-					-- Haiku rejects "between_tools" -- the two are not interchangeable).
-					-- model = "claude-haiku-5-5",
-					model = "claude-sonnet-5-5",
-					api_key = "ANTHROPIC_API_KEY",
+					-- Haiku, because time-to-first-token is the whole cost on a
+					-- completion path. Moving to a Sonnet means revisiting the
+					-- thinking setting below -- the two families do not accept
+					-- the same values -- and re-checking that the digest still
+					-- caches: the minimum cacheable prefix is per-model, and
+					-- below it nothing is cached and nothing says so.
+					model = "claude-haiku-5-5",
+					api_key = require("ai.keys").reader("anthropic-api-key", "ANTHROPIC_API_KEY"),
 					max_tokens = 256,
 					stream = true,
+
+					-- The project digest goes here rather than into the user
+					-- message, for two reasons. The render order is tools, then
+					-- system, then messages, so anything in the system prompt
+					-- sits ahead of the volatile cursor context; and a single
+					-- breakpoint at the end of system then covers the whole
+					-- stable prefix. Keys not named here keep their defaults.
+					system = {
+						template = defaults.default_system.template .. "\n{{{project}}}",
+						project = function()
+							return require("ai.context").digest()
+						end,
+					},
+
+					-- The backend sends `system` as a plain string, and
+					-- cache_control only attaches to a content block, so this
+					-- rewrites it into one. Everything before the breakpoint --
+					-- here, the whole system prompt including the digest -- is
+					-- cached; the messages after it are not, which is exactly
+					-- the split we want.
+					transform = {
+						function(data)
+							if type(data.body.system) == "string" then
+								data.body.system = {
+									{
+										type = "text",
+										text = data.body.system,
+										cache_control = { type = "ephemeral" },
+									},
+								}
+							end
+							return data
+						end,
+					},
+
 					optional = {
 						-- The lowest thinking setting this model takes. Without tools
 						-- in the request it means no thinking at all, so the first token
 						-- arrives without waiting on reasoning. Takes no other field.
-						thinking = { type = "between_tools" },
 						-- Must stay at "high" or below for the setting above to be
 						-- accepted; "low" also keeps the completion terse.
-						output_config = { effort = "low" },
+						output_config = { effort = "high" },
 					},
 				},
 			},

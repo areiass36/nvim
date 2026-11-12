@@ -1,7 +1,11 @@
 -- Every icon the UI renders, in one place. The glyphs live in the icon-only
--- font assets/fonts/ConfigIcons.ttf (built from assets/icons/*.svg by
--- scripts/icon-font/build.mjs) at U+F600 onwards, a private-use range the
+-- font assets/fonts/ConfigIcons.ttf at U+F600 onwards, a private-use range the
 -- Nerd Fonts leave empty. Each icon is used in exactly one context.
+--
+-- This table and assets/icons/map.json are the font's source and have to stay
+-- in step; scripts/icon-font builds the font from the map and the Font Awesome
+-- Pro SVGs, which are not in this repository. So adding an icon means a
+-- machine that has that package: see scripts/icon-font/README.md.
 return {
 	diagnostic_error = "\u{f600}", -- circle-xmark
 	diagnostic_warn = "\u{f601}", -- triangle-exclamation
@@ -36,4 +40,16 @@ return {
 	chevron_down = "\u{f61e}", -- chevron-down
 	current_frame = "\u{f61f}", -- angles-right
 	branch = "\u{f620}", -- code-branch
+	database = "\u{f621}", -- database
+	table = "\u{f622}", -- table
+	-- The levels of the database explorer, in the order you walk them:
+	-- a connection, one of its databases, a schema, a table, a column.
+	server = "\u{f623}", -- server
+	schema = "\u{f624}", -- layer-group
+	set = "\u{f625}", -- table-cells-rows
+	view = "\u{f626}", -- eye
+	collection = "\u{f627}", -- brackets-curly
+	column = "\u{f628}", -- table-cells-columns
+	key = "\u{f629}", -- key
+	up = "\u{f62a}", -- arrow-turn-up
 }

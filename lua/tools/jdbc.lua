@@ -39,6 +39,13 @@ local DRIVERS = {
 		jar = "duckdb_jdbc-1.3.1.0.jar",
 		url = MAVEN .. "/org/duckdb/duckdb_jdbc/1.3.1.0/duckdb_jdbc-1.3.1.0.jar",
 	},
+	-- Trino is a query engine in front of other stores rather than a store, so
+	-- this jar speaks its HTTP protocol instead of a database wire protocol.
+	-- Catalogs are the level above schemas; the explorer already walks them.
+	trino = {
+		jar = "trino-jdbc-484.jar",
+		url = MAVEN .. "/io/trino/trino-jdbc/484/trino-jdbc-484.jar",
+	},
 	-- JetBrains', the one DataGrip itself uses: Apache-2.0, and the only
 	-- JDBC driver that talks to a plain mongod. MongoDB's own driver needs
 	-- the Atlas SQL interface, which a local server does not have.

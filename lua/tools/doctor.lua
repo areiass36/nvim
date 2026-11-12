@@ -18,6 +18,8 @@ local MASON_PACKAGES = {
 	"json-lsp",
 	"pyright",
 	"css-lsp",
+	"jdtls",
+	"powershell-editor-services",
 	"debugpy",
 	"js-debug-adapter",
 	"tree-sitter-cli",
@@ -50,7 +52,7 @@ local function build_report()
 		local ok, path = executable(name)
 		row(ok, name, ok and path or "MISSING (required)")
 	end
-	for _, name in ipairs({ "node", "npm", "dotnet", "python3" }) do
+	for _, name in ipairs({ "node", "npm", "dotnet", "python3", "pwsh", "java" }) do
 		local ok, path = executable(name)
 		row(ok, name, ok and path or "missing (only needed for that language)")
 	end

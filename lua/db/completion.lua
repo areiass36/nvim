@@ -55,9 +55,18 @@ function source:complete(request, callback)
 		callback({ items = items, isIncomplete = false })
 	end
 
+	-- The catalog the sweep was keyed by, and the schema that actually holds
+	-- the table. Asking with neither -- which is what this did -- means every
+	-- keystroke misses the swept catalog entirely and waits on the server for
+	-- an answer that was already on disk.
+	local catalog = schema.catalog_of(connection)
+	local function schema_of(table_name)
+		return schema.locate_table(connection, catalog, table_name) or connection.default_schema
+	end
+
 	if alias then
 		local table_name = table_for_alias(bufnr, alias) or alias
-		return schema.columns(connection, connection.default_schema, table_name, function(columns, err)
+		return schema.columns(connection, schema_of(table_name), table_name, function(columns, err)
 			if err or not columns then
 				return finish({})
 			end
@@ -65,12 +74,30 @@ function source:complete(request, callback)
 			for _, column in ipairs(columns) do
 				items[#items + 1] = {
 					label = tostring(column.name),
-					kind = require("cmp").lsp.CompletionItemKind.Field,
+					kind = vim.lsp.protocol.CompletionItemKind.Field,
 					detail = tostring(column.type or ""),
 				}
 			end
 			finish(items)
-		end)
+		end, catalog)
+	end
+
+	-- Every schema the sweep found, not just the configured one: an
+	-- unqualified name in a statement is resolved against all of them.
+	local listed = {}
+	local swept = schema.schemas_known(connection, catalog)
+	if swept then
+		for _, record in ipairs(swept) do
+			local tables = schema.tables_known(connection, catalog, record.name)
+			for _, table_record in ipairs(tables or {}) do
+				listed[#listed + 1] = {
+					label = tostring(table_record.name),
+					kind = vim.lsp.protocol.CompletionItemKind.Class,
+					detail = ("%s  %s"):format(tostring(table_record.kind or "table"), record.name),
+				}
+			end
+		end
+		return finish(listed)
 	end
 
 	schema.tables(connection, connection.default_schema, nil, function(tables, err)
@@ -81,13 +108,17 @@ function source:complete(request, callback)
 		for _, record in ipairs(tables) do
 			items[#items + 1] = {
 				label = tostring(record.name),
-				kind = require("cmp").lsp.CompletionItemKind.Class,
+				kind = vim.lsp.protocol.CompletionItemKind.Class,
 				detail = tostring(record.kind or "table"),
 			}
 		end
 		finish(items)
-	end)
+	end, catalog)
 end
+
+--- Exposed so the tests can ask it for completions without standing up cmp,
+--- the same way db/explorer exposes its levels.
+M.source = source
 
 function M.setup()
 	local ok, cmp = pcall(require, "cmp")

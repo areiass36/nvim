@@ -121,7 +121,10 @@ function M.everything(state, path)
 	db.notify("exporting the full result...")
 	runner.run({
 		connection = result.connection,
-		sql = result.base_sql or result.sql,
+		-- The statement as it ran, not the one the user typed: a grid that was
+		-- sorted carries its ORDER BY in the wrapper around it, and a file
+		-- exported in another order than the one on screen is a surprise.
+		sql = result.sql or result.base_sql,
 		mode = "export",
 		limit = 0,
 		out_file = path,
@@ -131,7 +134,9 @@ function M.everything(state, path)
 		if err then
 			return db.notify(("export failed: %s"):format(err.message), vim.log.levels.ERROR)
 		end
-		db.notify(("%s rows written to %s"):format(tostring((written or {}).update_count or "all"), path))
+		-- The count comes back from the client, which is the only thing that
+		-- saw the rows: nothing was collected here to count.
+		db.notify(("%s rows written to %s"):format(tostring((written or {}).rows_written or "all"), path))
 	end)
 end
 

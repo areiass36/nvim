@@ -126,9 +126,87 @@ function M.setup()
 	end, { desc = "Drop the passwords held in memory" })
 
 	command("DbSchemaReload", function()
-		require("db.schema").invalidate(resolve.for_buf(0))
-		db.notify("schema cache cleared")
-	end, { desc = "Clear the cached catalog" })
+		-- Only this buffer's connection. Passing nil would clear every
+		-- connection's catalog, which is not what "reload" asks for.
+		local connection = current_connection()
+		if not connection then
+			return
+		end
+		require("db.schema").invalidate(connection)
+		db.notify(("%s: cached catalog cleared"):format(connection.name))
+	end, { desc = "Clear the cached catalog for this buffer's connection" })
+
+	command("DbIntrospect", function(args)
+		local connection = current_connection()
+		if not connection then
+			return
+		end
+		local schema = require("db.schema")
+		-- The catalog the explorer would open on, so what is swept is what the
+		-- explorer then reads. An argument overrides it.
+		local catalog = require("db.explorer").entry_point(connection).context.catalog
+		if args.args ~= "" then
+			catalog = args.args
+		end
+
+		if args.bang then
+			if not schema.introspecting(connection, catalog) then
+				return db.notify("nothing is being introspected")
+			end
+			-- The same cancel the runner uses: it reaches the sweep's own
+			-- threads as well as a running statement.
+			require("db.jvm").request(connection, "cancel", {}, function() end)
+			return db.notify("cancelling the introspect")
+		end
+
+		db.notify(("introspecting %s%s..."):format(connection.name, catalog and ("/" .. catalog) or ""))
+		schema.introspect(connection, catalog, {}, function(summary, err)
+			if err then
+				return db.notify(("introspect failed: %s"):format(err), vim.log.levels.ERROR)
+			end
+			db.notify(
+				("%s: %d schemas, %d tables, %d columns in %d ms%s%s"):format(
+					connection.name,
+					summary.schemas,
+					summary.tables,
+					summary.columns,
+					summary.elapsed_ms,
+					summary.parallel and "" or " (one connection)",
+					summary.partial and " -- definitions incomplete, run it again to finish" or ""
+				)
+			)
+		end)
+	end, {
+		nargs = "?",
+		bang = true,
+		desc = "Sweep this buffer's whole database and keep it (! cancels)",
+	})
+
+	command("DbDisconnect", function(args)
+		local jvm = require("db.jvm")
+		if args.bang then
+			jvm.stop(nil)
+			return db.notify("disconnected from every database")
+		end
+		local id = args.args
+		if id == "" then
+			local connection = current_connection()
+			if not connection then
+				return
+			end
+			id = connection.id
+		end
+		if not jvm.is_connected(id) then
+			return db.notify(("%s is not connected"):format(id))
+		end
+		jvm.stop(id)
+		db.notify(("disconnected from %s"):format(id))
+	end, {
+		nargs = "?",
+		bang = true,
+		complete = connection_names,
+		desc = "Stop a connection's database process (! stops every one)",
+	})
 
 	command("DbNewQuery", function()
 		local connection = current_connection()
@@ -186,7 +264,10 @@ function M.init_project()
 		{ "git", "check-ignore", "-q", ".nvim/databases.json" },
 		{ cwd = root },
 		vim.schedule_wrap(function(result)
-			if result.code ~= 0 then
+			-- Only when git says "not ignored" (1). Any other code means it
+			-- could not answer, and a folder that is not a repository cannot
+			-- commit the file anywhere.
+			if result.code == 1 then
 				local answer = vim.fn.confirm(
 					".nvim/databases.json is not gitignored. Add '.nvim/' to .gitignore?",
 					"&Yes\n&No",
