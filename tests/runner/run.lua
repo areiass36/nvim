@@ -15,6 +15,7 @@ local UNIT = {
 	"tests.runner.unit_resolve",
 	"tests.runner.unit_link",
 	"tests.runner.unit_dap",
+	"tests.runner.unit_exclude",
 }
 
 local LIVE = {}

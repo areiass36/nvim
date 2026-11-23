@@ -12,7 +12,15 @@ local OS_NAMES = { windows = true, mac = true, linux = true }
 local READY_SIGNALS = { "port", "log", "http", "delay" }
 
 local KNOWN = {
-	root = { version = true, workspace = true, default = true, link = true, project = true, cluster = true },
+	root = {
+		version = true,
+		workspace = true,
+		default = true,
+		link = true,
+		project = true,
+		cluster = true,
+		exclude = true,
+	},
 	project = { name = true, path = true, runner = true },
 	runner = {
 		label = true,
@@ -574,6 +582,17 @@ function M.validate(doc)
 	if doc.link ~= nil and want_array(report, "link", doc.link, "an array of links") then
 		for position, link in ipairs(doc.link) do
 			validate_link(report, ("link[%d]"):format(position), link, index)
+		end
+	end
+
+	-- Globs handed to rg as --glob=!<entry>, so a leading ! would turn the
+	-- exclusion back into an inclusion.
+	if doc.exclude ~= nil and want_array(report, "exclude", doc.exclude, "an array of globs") then
+		for position, glob in ipairs(doc.exclude) do
+			local path = ("exclude[%d]"):format(position)
+			if want_string(report, path, glob, "a glob") and vim.startswith(glob, "!") then
+				report.error(path, ("%q: every entry already excludes, drop the leading !"):format(glob))
+			end
 		end
 	end
 

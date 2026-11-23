@@ -64,6 +64,25 @@ function M.addresses(bufnr)
 	return found
 end
 
+--- The `exclude` globs of the workspace above `dir` (the cwd by default) and
+--- that workspace's root, or nothing when there is none. Read even when the rest
+--- of the file has errors: hiding files from a picker does not depend on the
+--- runners being right. The read is memoised on the file's mtime, so asking on
+--- every picker costs a stat and an edit is seen on the next one.
+--- @return string[] globs, string|nil root
+function M.exclude(dir)
+	local load = require("runner.load")
+	local root = load.find_from(dir or vim.uv.cwd())
+	local workspace = root and load.open(root)
+	local globs = workspace and workspace.doc and workspace.doc.exclude
+	if type(globs) ~= "table" then
+		return {}, root
+	end
+	return vim.tbl_filter(function(glob)
+		return type(glob) == "string" and glob ~= "" and not vim.startswith(glob, "!")
+	end, globs), root
+end
+
 function M.reload()
 	require("runner.load").invalidate()
 end

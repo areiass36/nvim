@@ -243,6 +243,19 @@ reports every problem with its path, like `project[2].runner[1].command`.
 }
 ```
 
+`exclude` hides files from `<leader>ff`, `<leader>fg` and the file browser (`<leader>ee`, `<leader>ef`),
+including the preview of a folder, the way `files.exclude` does in VS Code. Each entry is a glob relative to the workspace root, read the
+gitignore way: a name without a slash (`dist`, `*.min.js`) matches at any depth, one with a slash
+(`apps/legacy`, `apps/*/dist`) only from the root, and hiding a folder hides everything inside it. The
+list is read again on every search and on every listing of the browser, so an edit applies on the next
+one with nothing to reload, and it is read even when the rest of the file has errors. `<leader>ff` and
+`<leader>fg` take the workspace above the cwd, where rg searches; the browser takes the one above the
+folder it is showing.
+
+```json
+{ "exclude": ["dist", "coverage", "**/*.min.js", "apps/legacy/**"] }
+```
+
 The file is found by walking up from the buffer, never from the cwd. `,rr` (`:RunnerRun`) starts the
 default target and `:RunnerRun <address>` a specific one, completing on `project:label` and `#cluster`:
 each wave is started together and waited for (`ready`: `port`, `http`, `log`, `delay`) before the next

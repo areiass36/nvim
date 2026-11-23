@@ -30,10 +30,9 @@ local function search_from(bufnr)
 	return vim.fs.normalize(vim.fs.dirname(name))
 end
 
---- Walk up from the buffer looking for the workspace file. Unlike nvim-dap's
---- launch.json provider, nothing here depends on the cwd.
-function M.find(bufnr)
-	local from = search_from(bufnr)
+--- Walk up from `from`, a directory, looking for the workspace file.
+function M.find_from(from)
+	from = vim.fs.normalize(from)
 	if vim.uv.fs_stat(from .. "/" .. M.FILE) then
 		return from
 	end
@@ -43,6 +42,12 @@ function M.find(bufnr)
 		end
 	end
 	return nil
+end
+
+--- Walk up from the buffer looking for the workspace file. Unlike nvim-dap's
+--- launch.json provider, nothing here depends on the cwd.
+function M.find(bufnr)
+	return M.find_from(search_from(bufnr))
 end
 
 -- Only a line that starts with // is dropped, so a "http://host" value keeps

@@ -15,13 +15,89 @@ return {
 	},
 	config = function()
 		local telescope = require("telescope")
+		local find_command = { "rg", "--files", "--color", "never", "--glob", "!**/.git/*" }
 		-- The extension loads this module itself; requiring it here avoids touching
 		-- telescope.extensions before setup has run, which would set the extension up
 		-- with an empty config.
 		local fb_actions = require("telescope._extensions.file_browser.actions")
+		local fb_finders = require("telescope._extensions.file_browser.finders")
+		local exclude = require("runner.exclude")
+
+		-- The browser hands every path it lists to the finder's entry maker, so
+		-- the `exclude` of .nvim/workspace.json is applied there: a path it hides
+		-- gets no entry. The workspace is looked up from the folder being shown
+		-- each time the listing is built -- on open, on every folder change and
+		-- on every refresh -- so an edit to the file shows on the next one, and
+		-- walking into another workspace brings its own list.
+		local function skipping_excluded(browse)
+			return function(finder)
+				local globs, root = require("runner").exclude(finder.path or finder.cwd)
+				if #globs == 0 then
+					return browse(finder)
+				end
+				local hidden = exclude.matcher(globs, root)
+				local make = finder.entry_maker
+				return browse(setmetatable({
+					entry_maker = function(local_opts)
+						local inner = make(local_opts)
+						return function(path)
+							local entry = inner(path)
+							if entry and hidden(entry.path) then
+								return nil
+							end
+							return entry
+						end
+					end,
+				}, { __index = finder }))
+			end
+		end
+
+		-- A folder's preview is Telescope's own `ls` of it, which knows nothing of
+		-- the workspace: the folder the browser hides from the list was still
+		-- there in the preview of its parent. Once the listing is in the buffer,
+		-- the lines of the hidden entries are deleted; the highlights are
+		-- extmarks, so the ones left keep their colours. Every line ends with the
+		-- entry's name, in the long format and the short one alike.
+		local previewers = require("telescope.previewers")
+		local function previewing_without_excluded(filepath, bufnr, opts)
+			opts = opts or {}
+			if vim.fn.isdirectory(filepath) == 0 then
+				return previewers.buffer_previewer_maker(filepath, bufnr, opts)
+			end
+			local globs, root = require("runner").exclude(filepath)
+			if #globs == 0 then
+				return previewers.buffer_previewer_maker(filepath, bufnr, opts)
+			end
+			local hidden = exclude.matcher(globs, root)
+			local names = {}
+			for name in vim.fs.dir(filepath) do
+				if hidden(filepath .. "/" .. name) then
+					names[#names + 1] = name
+				end
+			end
+			local callback = opts.callback
+			opts.callback = function(buffer)
+				if #names > 0 and vim.api.nvim_buf_is_valid(buffer) then
+					local lines = vim.api.nvim_buf_get_lines(buffer, 0, -1, false)
+					for row = #lines, 1, -1 do
+						for _, name in ipairs(names) do
+							if lines[row] == name or vim.endswith(lines[row], " " .. name) then
+								vim.api.nvim_buf_set_lines(buffer, row - 1, row, false, {})
+								break
+							end
+						end
+					end
+				end
+				if callback then
+					callback(buffer)
+				end
+			end
+			previewers.buffer_previewer_maker(filepath, bufnr, opts)
+		end
 
 		telescope.setup({
 			defaults = {
+				buffer_previewer_maker = previewing_without_excluded,
 				-- Hidden entries belong to the project just as much as the rest: .github,
 				-- .editorconfig, .env.example, and on Windows everything under AppData,
 				-- which is hidden by file attribute instead of a leading dot. rg's
@@ -80,7 +156,7 @@ return {
 				-- tools/ripgrep.lua downloads it when the machine has none.
 				find_files = {
 					hidden = true,
-					find_command = { "rg", "--files", "--color", "never", "--glob", "!**/.git/*" },
+					find_command = find_command,
 				},
 			},
 			extensions = {
@@ -102,8 +178,11 @@ return {
 					-- Telescope applies file_ignore_patterns to every entry that has a
 					-- path, the browser included, so node_modules/ and obj/ stayed
 					-- invisible here even with gitignore off. Empty for this picker
-					-- alone: find_files and the grep keep the defaults.
+					-- alone: find_files and the grep keep the defaults. What a project
+					-- does want hidden comes from its workspace (skipping_excluded).
 					file_ignore_patterns = {},
+					browse_files = skipping_excluded(fb_finders.browse_files),
+					browse_folders = skipping_excluded(fb_finders.browse_folders),
 					-- toggle_respect_gitignore ships unmapped; <C-h> toggles only the dot
 					-- filter. <A-i> joins the <A-*> family already used for create/rename.
 					mappings = {
@@ -133,8 +212,19 @@ return {
 		local map = function(lhs, rhs)
 			vim.keymap.set("n", lhs, rhs, { noremap = true, silent = true })
 		end
-		map("<leader>ff", builtin.find_files)
-		map("<leader>fg", extensions.live_grep_args.live_grep_args)
+		-- The `exclude` of the .nvim/workspace.json above the cwd, which is where
+		-- rg searches, as rg globs. Read on every open rather than once in setup,
+		-- so an edit to the file shows on the next search.
+		local function excluded()
+			local globs, root = require("runner").exclude()
+			return root and exclude.rg_args(globs, root, vim.uv.cwd()) or {}
+		end
+		map("<leader>ff", function()
+			builtin.find_files({ find_command = vim.list_extend(vim.deepcopy(find_command), excluded()) })
+		end)
+		map("<leader>fg", function()
+			extensions.live_grep_args.live_grep_args({ additional_args = excluded() })
+		end)
 		map("<leader>fb", builtin.buffers)
 		map("<leader>fr", builtin.oldfiles)
 		map("<leader>es", extensions.telepoon.telepoon)

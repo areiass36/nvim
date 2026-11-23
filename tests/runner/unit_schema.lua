@@ -63,6 +63,16 @@ check(
 	{ "link[2].name" }
 )
 
+support.describe("exclude")
+check("exclude takes an array of globs", ok_of(doc({ exclude = { "dist", "**/*.min.js" } })), true)
+check("exclude cannot be a single string", paths(doc({ exclude = "dist" })), { "exclude" })
+check("an exclude entry must be a string", paths(doc({ exclude = { "dist", 3 } })), { "exclude[2]" })
+check(
+	"a negated exclude entry is rejected",
+	message(doc({ exclude = { "!dist" } }), "exclude[1]"),
+	'"!dist": every entry already excludes, drop the leading !'
+)
+
 support.describe("runner")
 check(
 	"a command string is rejected with the array to use",
