@@ -11,6 +11,7 @@ local PARSERS = {
 	"html",
 	"css",
 	"json",
+	"yaml",
 	"sql",
 	"csv",
 	"c_sharp",

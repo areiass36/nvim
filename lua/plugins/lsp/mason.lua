@@ -7,6 +7,7 @@ local PACKAGES = {
 	"lua-language-server",
 	"angular-language-server",
 	"json-lsp",
+	"yaml-language-server",
 	"pyright",
 	"css-lsp",
 	"jdtls",
