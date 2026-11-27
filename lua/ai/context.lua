@@ -40,6 +40,13 @@ local SCAN_CHUNK = 25
 -- Files larger than this are skipped: a generated or vendored blob tells the
 -- model nothing about how this project is written.
 local MAX_FILE_BYTES = 200 * 1024
+-- Limits on the walk used when git cannot list the project. The walk is
+-- synchronous, so these are what bound how long it can hold the editor: how
+-- deep it goes, how many directory entries it looks at, and how many files it
+-- hands on to be read.
+local WALK_DEPTH = 5
+local MAX_WALK_ENTRIES = 20000
+local MAX_WALK_FILES = 2000
 
 -- A line is kept when it looks like a top-level declaration. Matching whole
 -- lines instead of parsing out names is deliberate -- the signature is more
@@ -118,13 +125,23 @@ local state = {
 	refresh_timer = nil,
 }
 
+local ROOT_MARKERS = { ".git", "lazy-lock.json" }
+
+-- The project the current buffer belongs to, else the one the working
+-- directory is in, else nil. There is deliberately no fallback to the bare
+-- working directory: editing ~/.ssh/config from a shell sitting in the home
+-- directory would make the whole home directory the "project", and indexing
+-- that freezes the editor for as long as it takes to walk it.
 local function project_root()
-	return vim.fs.root(0, { ".git", "lazy-lock.json" }) or vim.uv.cwd()
+	return vim.fs.root(0, ROOT_MARKERS) or vim.fs.root(vim.uv.cwd(), ROOT_MARKERS)
 end
 
 local function relative(root, path)
-	local normal_root = vim.fs.normalize(root)
 	local normal_path = vim.fs.normalize(path)
+	if not root then
+		return normal_path
+	end
+	local normal_root = vim.fs.normalize(root)
 	if normal_path:sub(1, #normal_root + 1) == normal_root .. "/" then
 		return normal_path:sub(#normal_root + 2)
 	end
@@ -192,17 +209,35 @@ local function declarations(root, path)
 	return "-- " .. relative(root, path) .. "\n" .. table.concat(kept, "\n")
 end
 
+-- Whether a path relative to the root lies under a skipped directory, at any
+-- depth: packages/web/node_modules is as vendored as node_modules is.
+local function in_skipped_directory(path)
+	for segment in path:gmatch("([^/]+)/") do
+		if SKIP_DIRECTORIES[segment] then
+			return true
+		end
+	end
+	return false
+end
+
 -- The fallback for a project that is not a git repository, or a machine with no
--- git on PATH. Bounded by depth and by the skip list, since without git there
--- is nothing that knows what is generated or vendored here.
+-- git on PATH. Bounded by depth, by the skip list and by the entry and file
+-- limits above, since without git there is nothing that knows what is
+-- generated or vendored here. Past a limit the index is simply partial.
 local function walk(root)
 	local found = {}
+	local visited = 0
 	for name, kind in vim.fs.dir(root, {
-		depth = 8,
+		depth = WALK_DEPTH,
+		-- Called with the path relative to the root, not the bare name.
 		skip = function(directory)
-			return not SKIP_DIRECTORIES[directory]
+			return not SKIP_DIRECTORIES[vim.fs.basename(directory)]
 		end,
 	}) do
+		visited = visited + 1
+		if visited > MAX_WALK_ENTRIES or #found >= MAX_WALK_FILES then
+			break
+		end
 		if kind == "file" and patterns_for(name) then
 			found[#found + 1] = root .. "/" .. name
 		end
@@ -224,8 +259,7 @@ local function file_list(root, callback)
 			local paths = {}
 			if result.code == 0 then
 				for line in (result.stdout or ""):gmatch("[^\r\n]+") do
-					local segment = line:match("^([^/]+)/")
-					if not (segment and SKIP_DIRECTORIES[segment]) then
+					if not in_skipped_directory(line) then
 						paths[#paths + 1] = root .. "/" .. line
 					end
 				end
@@ -352,10 +386,25 @@ function M.rebuild()
 	if state.building then
 		return
 	end
-	state.building = true
-	state.root = project_root()
 
-	local root = state.root
+	local root = project_root()
+	if not root then
+		-- No project, so nothing to index. The empty index is still an index:
+		-- digest() then sends the neighbours alone, and asks again on the next
+		-- request in case a project file has been opened since.
+		if state.root or state.index ~= "" then
+			state.root = nil
+			state.index = ""
+			state.indexed_files = 0
+			state.generation = state.generation + 1
+			state.memo_key = nil
+			state.memo_value = nil
+		end
+		return
+	end
+
+	state.building = true
+	state.root = root
 	file_list(root, function(paths)
 		render_index(root, paths, function(rendered, count)
 			state.index = rendered
@@ -436,7 +485,9 @@ end
 --- identity of the selected buffers, so a typing pause costs nothing here.
 ---@return string
 function M.digest()
-	if not state.index and not state.building then
+	-- Also while there is no project: finding the root is a handful of stats,
+	-- and it is how a session started outside a project picks one up later.
+	if not state.building and (not state.index or not state.root) then
 		M.rebuild()
 	end
 

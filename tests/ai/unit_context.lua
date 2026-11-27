@@ -84,3 +84,82 @@ for path in digest:gmatch('<file path="([^"]+)">') do
 end
 support.check("one neighbour, the file that is not current", #rendered, 1)
 support.check("and it is not the current buffer", rendered[1], "lua/db/execute.lua")
+
+-- Everything below builds its own directories, because what it checks is what
+-- happens outside this repository: with no git to list the files, and with no
+-- project at all.
+local function write(path, lines)
+	vim.fn.mkdir(vim.fs.dirname(path), "p")
+	vim.fn.writefile(lines, path)
+end
+
+local function settle()
+	support.wait(function()
+		return not context.stats().building
+	end, 30000)
+end
+
+local home = vim.uv.cwd()
+local scratch = vim.uv.fs_realpath(vim.fn.fnamemodify(vim.fn.tempname(), ":h"))
+
+support.describe("ai/context: the walk, for a project git cannot list")
+
+local project = scratch .. "/ai-context-walk"
+vim.fn.delete(project, "rf")
+write(project .. "/lazy-lock.json", { "{}" })
+write(project .. "/src/kept.lua", { "local function kept() end" })
+write(project .. "/node_modules/top.lua", { "local function vendored_top() end" })
+write(project .. "/packages/web/node_modules/nested.lua", { "local function vendored_nested() end" })
+write(project .. "/packages/web/dist/bundle.lua", { "local function bundled() end" })
+write(project .. "/a/b/c/d/e/f/too_deep.lua", { "local function too_deep() end" })
+
+vim.cmd.edit(project .. "/src/kept.lua")
+settle()
+context.rebuild()
+settle()
+
+local walked = context.digest()
+support.check("the root is the marker's directory", context.stats().root, project)
+support.check("a project file is indexed", walked:find("-- src/kept.lua", 1, true) ~= nil, true)
+support.check("a skipped directory at the root is left out", walked:find("vendored_top", 1, true), nil)
+support.check("a skipped directory further down is left out", walked:find("vendored_nested", 1, true), nil)
+support.check("so is one with another name", walked:find("bundled", 1, true), nil)
+support.check("the walk stops at its depth", walked:find("too_deep", 1, true), nil)
+
+-- This is the case that froze the editor: a file with no project around it,
+-- opened from a directory that is not one either. The root used to fall back
+-- to the working directory, and from a shell in the home directory that meant
+-- walking and reading all of it.
+support.describe("ai/context: no project")
+
+local loose = scratch .. "/ai-context-loose"
+vim.fn.delete(loose, "rf")
+write(loose .. "/notes.lua", { "local function loose() end" })
+write(loose .. "/other.lua", { "local function never_read() end" })
+
+vim.cmd.edit(loose .. "/notes.lua")
+vim.cmd.cd(loose)
+settle()
+context.rebuild()
+
+local none = context.stats()
+support.check("there is no root", none.root, nil)
+support.check("nothing is being built", none.building, false)
+support.check("and nothing is indexed", none.files, 0)
+
+local bare = context.digest()
+support.check("the digest carries no index", bare:find("declarations of every file", 1, true), nil)
+support.check("nor a file that was never opened", bare:find("never_read", 1, true), nil)
+support.check("the neighbours are still sent", bare:find("most recently open", 1, true) ~= nil, true)
+support.check("and it is stable", context.digest() == bare, true)
+
+-- A session that starts outside a project picks one up when it gets there.
+vim.cmd.cd(home)
+vim.cmd.buffer("lua/core/icons.lua")
+context.digest()
+settle()
+support.check("a project is picked up again", context.stats().root, vim.fs.normalize(home))
+support.check("with its index", context.stats().files > 50, true)
+
+vim.fn.delete(project, "rf")
+vim.fn.delete(loose, "rf")
